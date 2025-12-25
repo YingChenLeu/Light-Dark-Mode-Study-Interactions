@@ -4,13 +4,15 @@ import {
   StudyPhase, 
   TaskResult, 
   Condition,
-  Task 
+  Task,
+  CalibrationData
 } from "@/types/study";
 import { 
   generateParticipantId, 
   createConditions, 
   createTasks 
 } from "@/lib/study-utils";
+import { getPredictedTimeForTask } from "@/lib/calibration-utils";
 
 interface StudyContextType {
   state: StudyState;
@@ -18,10 +20,11 @@ interface StudyContextType {
   setDebugMode: (mode: boolean) => void;
   startStudy: () => void;
   nextPhase: () => void;
-  recordTaskResult: (result: Omit<TaskResult, "participantId" | "conditionLabel" | "interfaceMode" | "roomCondition" | "timestamp">) => void;
+  recordTaskResult: (result: Omit<TaskResult, "participantId" | "conditionLabel" | "interfaceMode" | "roomCondition" | "timestamp" | "predictedTimeMs">) => void;
   getCurrentCondition: () => Condition | null;
   getCurrentTask: () => Task | null;
   resetStudy: () => void;
+  setCalibrationData: (data: CalibrationData) => void;
 }
 
 const initialState: StudyState = {
@@ -38,6 +41,7 @@ const initialState: StudyState = {
     conditionOrder: [],
     completed: false,
   },
+  calibrationData: undefined,
 };
 
 const StudyContext = createContext<StudyContextType | null>(null);
@@ -46,11 +50,12 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<StudyState>(initialState);
   const [debugMode, setDebugMode] = useState(false);
 
-  const applyInterfaceMode = useCallback((mode: "light" | "dark") => {
+  const applyInterfaceMode = useCallback((mode: "light" | "dark" | "neutral") => {
+    document.documentElement.classList.remove("dark", "neutral");
     if (mode === "dark") {
       document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
+    } else if (mode === "neutral") {
+      document.documentElement.classList.add("neutral");
     }
   }, []);
 
@@ -73,8 +78,22 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
         conditionOrder: conditions.map(c => c.label),
         completed: false,
       },
+      calibrationData: undefined,
     });
   }, []);
+
+  const setCalibrationData = useCallback((data: CalibrationData) => {
+    setState(prev => ({
+      ...prev,
+      calibrationData: data,
+      phase: "condition-intro" as StudyPhase,
+    }));
+    // Apply first condition's interface mode after calibration
+    const condition = state.conditions[0];
+    if (condition) {
+      applyInterfaceMode(condition.interfaceMode);
+    }
+  }, [state.conditions, applyInterfaceMode]);
 
   const getCurrentCondition = useCallback((): Condition | null => {
     if (state.currentConditionIndex >= state.conditions.length) return null;
@@ -92,10 +111,13 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       
       switch (prev.phase) {
         case "instructions":
-          if (condition) {
-            applyInterfaceMode(condition.interfaceMode);
-          }
-          return { ...prev, phase: "condition-intro" as StudyPhase };
+          // Go to calibration phase with neutral theme
+          applyInterfaceMode("neutral");
+          return { ...prev, phase: "calibration" as StudyPhase };
+        
+        case "calibration":
+          // This is handled by setCalibrationData
+          return prev;
         
         case "condition-intro":
           return { 
@@ -139,10 +161,16 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
   }, [applyInterfaceMode]);
 
   const recordTaskResult = useCallback((
-    result: Omit<TaskResult, "participantId" | "conditionLabel" | "interfaceMode" | "roomCondition" | "timestamp">
+    result: Omit<TaskResult, "participantId" | "conditionLabel" | "interfaceMode" | "roomCondition" | "timestamp" | "predictedTimeMs">
   ) => {
     setState(prev => {
       const condition = prev.conditions[prev.currentConditionIndex];
+      const predictedTime = getPredictedTimeForTask(
+        result.taskType,
+        prev.calibrationData?.fittsEquation,
+        prev.calibrationData?.hicksEquation
+      );
+      
       const fullResult: TaskResult = {
         ...result,
         participantId: prev.participantId,
@@ -150,6 +178,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
         interfaceMode: condition?.interfaceMode || "light",
         roomCondition: condition?.roomCondition || "bright",
         timestamp: new Date().toISOString(),
+        predictedTimeMs: predictedTime,
       };
       return { ...prev, results: [...prev.results, fullResult] };
     });
@@ -175,6 +204,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       getCurrentCondition,
       getCurrentTask,
       resetStudy,
+      setCalibrationData,
     }}>
       {children}
     </StudyContext.Provider>

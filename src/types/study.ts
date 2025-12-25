@@ -1,4 +1,4 @@
-export type InterfaceMode = "light" | "dark";
+export type InterfaceMode = "light" | "dark" | "neutral";
 export type RoomCondition = "bright" | "dark";
 
 export interface Condition {
@@ -29,6 +29,7 @@ export interface TaskResult {
   cursorDistancePx: number;
   success: boolean;
   timestamp: string;
+  predictedTimeMs?: number;
 }
 
 export interface ParticipantData {
@@ -42,6 +43,7 @@ export interface ParticipantData {
 export type StudyPhase = 
   | "consent"
   | "instructions"
+  | "calibration"
   | "condition-intro"
   | "task"
   | "condition-complete"
@@ -56,4 +58,47 @@ export interface StudyState {
   currentTaskIndex: number;
   results: TaskResult[];
   participantData: ParticipantData;
+  calibrationData?: CalibrationData;
+}
+
+// Fitts' Law calibration types
+export interface FittsTrialData {
+  trialIndex: number;
+  targetWidth: number;
+  targetDistance: number;
+  movementTimeMs: number;
+  indexOfDifficulty: number; // log2(D/W + 1)
+  success: boolean;
+  timestamp: string;
+}
+
+// Hick's Law calibration types
+export interface HicksTrialData {
+  trialIndex: number;
+  numChoices: number;
+  targetKey: string;
+  reactionTimeMs: number;
+  correct: boolean;
+  timestamp: string;
+}
+
+// Computed law equations
+export interface FittsLawEquation {
+  a: number; // intercept
+  b: number; // slope
+  r2: number; // coefficient of determination
+}
+
+export interface HicksLawEquation {
+  a: number; // intercept
+  b: number; // slope
+  r2: number; // coefficient of determination
+}
+
+export interface CalibrationData {
+  fittsTrials: FittsTrialData[];
+  hicksTrials: HicksTrialData[];
+  fittsEquation?: FittsLawEquation;
+  hicksEquation?: HicksLawEquation;
+  calibrationComplete: boolean;
 }

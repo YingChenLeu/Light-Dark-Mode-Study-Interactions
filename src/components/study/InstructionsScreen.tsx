@@ -50,11 +50,20 @@ export function InstructionsScreen() {
             </section>
 
             <section>
+              <h3 className="font-medium mb-2">Calibration Phase</h3>
+              <p className="text-muted-foreground text-sm leading-relaxed">
+                First, you will complete a brief calibration to measure your baseline 
+                performance. This includes a pointing task (Fitts' Law) and a reaction 
+                time task (Hick's Law). Your personalized models will predict your 
+                performance on subsequent tasks.
+              </p>
+            </section>
+
+            <section>
               <h3 className="font-medium mb-2">Condition Changes</h3>
               <p className="text-muted-foreground text-sm leading-relaxed">
-                Between conditions, you will see a brief screen describing the current 
-                interface and lighting setup. The interface color will change automatically. 
-                Please imagine the room lighting matches the described condition.
+                After calibration, you will complete tasks across four conditions. 
+                The interface color will change automatically between conditions.
               </p>
             </section>
           </div>
@@ -65,7 +74,7 @@ export function InstructionsScreen() {
               className="w-full"
               size="lg"
             >
-              Start First Condition
+              Begin Calibration
             </Button>
           </div>
         </CardContent>

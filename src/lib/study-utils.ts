@@ -1,4 +1,4 @@
-import { Condition, Task, TaskResult, ParticipantData } from "@/types/study";
+import { Condition, Task, TaskResult, ParticipantData, CalibrationData } from "@/types/study";
 
 export function generateParticipantId(): string {
   const timestamp = Date.now().toString(36);
@@ -83,18 +83,64 @@ export function exportToCSV(results: TaskResult[]): string {
   const headers = Object.keys(results[0]).join(",");
   const rows = results.map(result => 
     Object.values(result).map(v => 
-      typeof v === "string" ? `"${v}"` : v
+      typeof v === "string" ? `"${v}"` : (v === undefined ? "" : v)
     ).join(",")
   );
   
   return [headers, ...rows].join("\n");
 }
 
-export function exportToJSON(results: TaskResult[], participantData: ParticipantData): string {
+export function exportToJSON(
+  results: TaskResult[], 
+  participantData: ParticipantData,
+  calibrationData?: CalibrationData
+): string {
   return JSON.stringify({
     participant: participantData,
+    calibration: calibrationData ? {
+      fittsEquation: calibrationData.fittsEquation,
+      hicksEquation: calibrationData.hicksEquation,
+      fittsTrialsCount: calibrationData.fittsTrials.length,
+      hicksTrialsCount: calibrationData.hicksTrials.length,
+    } : null,
     results: results,
   }, null, 2);
+}
+
+export function exportCalibrationToCSV(calibrationData: CalibrationData): string {
+  const fittsHeaders = "trialType,trialIndex,targetWidth,targetDistance,indexOfDifficulty,movementTimeMs,success,timestamp";
+  const fittsRows = calibrationData.fittsTrials.map(t => 
+    `fitts,${t.trialIndex},${t.targetWidth},${t.targetDistance},${t.indexOfDifficulty.toFixed(3)},${t.movementTimeMs},${t.success},"${t.timestamp}"`
+  );
+
+  const hicksHeaders = "trialType,trialIndex,numChoices,targetKey,reactionTimeMs,correct,timestamp";
+  const hicksRows = calibrationData.hicksTrials.map(t =>
+    `hicks,${t.trialIndex},${t.numChoices},"${t.targetKey}",${t.reactionTimeMs},${t.correct},"${t.timestamp}"`
+  );
+
+  const equationSummary = [
+    "",
+    "# Fitts' Law Equation: MT = a + b * log2(D/W + 1)",
+    calibrationData.fittsEquation 
+      ? `# a=${calibrationData.fittsEquation.a.toFixed(2)}, b=${calibrationData.fittsEquation.b.toFixed(2)}, R²=${calibrationData.fittsEquation.r2.toFixed(3)}`
+      : "# Not computed",
+    "",
+    "# Hick's Law Equation: RT = a + b * log2(n)",
+    calibrationData.hicksEquation
+      ? `# a=${calibrationData.hicksEquation.a.toFixed(2)}, b=${calibrationData.hicksEquation.b.toFixed(2)}, R²=${calibrationData.hicksEquation.r2.toFixed(3)}`
+      : "# Not computed",
+  ];
+
+  return [
+    "# Fitts' Law Trials",
+    fittsHeaders,
+    ...fittsRows,
+    "",
+    "# Hick's Law Trials", 
+    hicksHeaders,
+    ...hicksRows,
+    ...equationSummary
+  ].join("\n");
 }
 
 export function downloadFile(content: string, filename: string, type: string): void {
