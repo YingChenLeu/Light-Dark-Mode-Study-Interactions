@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { HicksTrialData } from "@/types/study";
 import { generateHicksTrials } from "@/lib/calibration-utils";
 
@@ -15,13 +15,28 @@ export function HicksLawTask({ onComplete }: HicksLawTaskProps) {
   const [waitingForStart, setWaitingForStart] = useState(true);
   const [feedback, setFeedback] = useState<"correct" | "incorrect" | null>(null);
 
+  const rangeStartCacheRef = useRef<Record<number, number>>({});
+
   const currentTrial = trials[currentTrialIndex];
   const isComplete = currentTrialIndex >= trials.length;
-  const activeKeys = ["A", "S", "D", "F"].slice(0, currentTrial?.numChoices || 4);
+  const allKeys = ["1","2","3","4","5","6","7"];
+  let startIndex = currentTrial?.rangeStartIndex;
+  if (startIndex === undefined && currentTrial) {
+    const cached = rangeStartCacheRef.current[currentTrialIndex];
+    if (cached !== undefined) {
+      startIndex = cached;
+    } else {
+      const computed = Math.floor(Math.random() * (allKeys.length - currentTrial.numChoices + 1));
+      rangeStartCacheRef.current[currentTrialIndex] = computed;
+      startIndex = computed;
+    }
+  }
+  if (startIndex === undefined) startIndex = 0;
+  const activeKeys = currentTrial ? allKeys.slice(startIndex, startIndex + currentTrial.numChoices) : allKeys;
 
   // Handle keyboard input
   const handleKeyPress = useCallback((event: KeyboardEvent) => {
-    const key = event.key.toUpperCase();
+    const key = event.key;
     
     if (waitingForStart && key === " ") {
       // Start the trial
@@ -34,6 +49,7 @@ export function HicksLawTask({ onComplete }: HicksLawTaskProps) {
       return;
     }
 
+    if (!currentTrial) return;
     if (!showTarget || trialStartTime === null) return;
     if (!activeKeys.includes(key)) return;
 
@@ -47,6 +63,8 @@ export function HicksLawTask({ onComplete }: HicksLawTaskProps) {
       reactionTimeMs: reactionTime,
       correct: isCorrect,
       timestamp: new Date().toISOString(),
+      rangeStartIndex: startIndex,
+      activeKeys: [...activeKeys],
     };
 
     setResults(prev => [...prev, trialResult]);
@@ -64,7 +82,7 @@ export function HicksLawTask({ onComplete }: HicksLawTaskProps) {
         onComplete([...results, trialResult]);
       }
     }, 500);
-  }, [waitingForStart, showTarget, trialStartTime, currentTrial, currentTrialIndex, trials.length, results, activeKeys, onComplete]);
+  }, [waitingForStart, showTarget, trialStartTime, currentTrial, currentTrialIndex, trials.length, results, activeKeys, onComplete, startIndex]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyPress);
@@ -83,10 +101,11 @@ export function HicksLawTask({ onComplete }: HicksLawTaskProps) {
     <div className="flex flex-col items-center justify-center h-full p-8">
       <div className="text-center mb-8">
         <h3 className="text-lg font-medium text-foreground mb-2">Hick's Law Calibration</h3>
+        <p className="text-sm text-muted-foreground mb-2">
+          Place your fingers on the number keys 1–7. Respond using only the highlighted range.
+        </p>
         <p className="text-sm text-muted-foreground mb-4">
-          Place your left hand on the A, S, D, F keys.
-          <br />
-          When a letter appears, press the corresponding key as quickly as possible.
+          Each trial will highlight a different range of numbers. Respond as quickly as possible once the target appears.
         </p>
         <p className="text-xs text-muted-foreground">
           Trial {currentTrialIndex + 1} of {trials.length}
@@ -95,7 +114,7 @@ export function HicksLawTask({ onComplete }: HicksLawTaskProps) {
 
       {/* Key display */}
       <div className="flex gap-2 mb-8">
-        {["A", "S", "D", "F"].map((key) => (
+        {["1","2","3","4","5","6","7"].map((key) => (
           <div
             key={key}
             className={`w-16 h-16 rounded-md flex items-center justify-center text-2xl font-bold border-2 ${
@@ -118,7 +137,9 @@ export function HicksLawTask({ onComplete }: HicksLawTaskProps) {
           <span className="text-sm text-muted-foreground">Wait...</span>
         )}
         {showTarget && (
-          <span className="text-5xl font-bold text-foreground">{currentTrial.targetKey}</span>
+          <span className="text-5xl font-bold text-foreground">
+            {String(currentTrial.targetKey)}
+          </span>
         )}
         {feedback === "correct" && (
           <span className="text-2xl text-success font-bold">✓</span>
@@ -129,7 +150,7 @@ export function HicksLawTask({ onComplete }: HicksLawTaskProps) {
       </div>
 
       <div className="mt-8 text-xs text-muted-foreground">
-        Active keys for this trial: {activeKeys.join(", ")}
+        Active range for this trial: {activeKeys.join(", ")}
       </div>
     </div>
   );

@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Task } from "@/types/study";
 import { Button } from "@/components/ui/button";
 import { calculateCursorDistance } from "@/lib/study-utils";
 import { Check } from "lucide-react";
+import { useStudy } from "@/contexts/StudyContext";
 
 interface TaskProps {
   task: Task;
@@ -11,25 +12,39 @@ interface TaskProps {
     totalClicks: number;
     incorrectClicks: number;
     cursorDistancePx: number;
+    predictedTimeMs?: number;
+    targetDistancePx?: number | null;
+    targetWidthPx?: number | null;
     success: boolean;
   }) => void;
 }
 
 export function ButtonClickTask({ task, onComplete }: TaskProps) {
+  const { state } = useStudy();
+  const calibration = state.calibrationData;
+
+  const buttons = ["Cancel", "Submit", "Continue", "Reset"];
+  const [targetButton, setTargetButton] = useState<string | null>(null);
+  const [shuffledButtons, setShuffledButtons] = useState<string[]>([]);
   const [started, setStarted] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [startTime, setStartTime] = useState(0);
   const [clicks, setClicks] = useState(0);
   const [incorrectClicks, setIncorrectClicks] = useState(0);
   const cursorPositions = useRef<{ x: number; y: number }[]>([]);
+  const startPosition = useRef<{ x: number; y: number } | null>(null);
+  const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
-  const buttons = ["Cancel", "Submit", "Continue", "Reset"];
-  const targetButton = task.targetValue || "Submit";
+
 
   useEffect(() => {
     if (!started) return;
 
     const handleMouseMove = (e: MouseEvent) => {
+      if (!startPosition.current) {
+        startPosition.current = { x: e.clientX, y: e.clientY };
+      }
+
       cursorPositions.current.push({ x: e.clientX, y: e.clientY });
     };
 
@@ -37,35 +52,60 @@ export function ButtonClickTask({ task, onComplete }: TaskProps) {
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, [started]);
 
-  const handleStart = useCallback(() => {
-    setStarted(true);
-    setStartTime(performance.now());
-    cursorPositions.current = [];
-  }, []);
-
-  const handleButtonClick = useCallback((buttonLabel: string) => {
+  const handleButtonClick = useCallback(
+  (buttonLabel: string) => {
     if (!started || completed) return;
 
     setClicks(prev => prev + 1);
 
     if (buttonLabel === targetButton) {
+      const targetEl = buttonRefs.current[buttonLabel];
+      let targetDistance = null;
+      let targetWidth = null;
+
+      if (targetEl && startPosition.current) {
+        const rect = targetEl.getBoundingClientRect();
+
+        const targetCenter = {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+        };
+
+        const dx = targetCenter.x - startPosition.current.x;
+        const dy = targetCenter.y - startPosition.current.y;
+
+        targetDistance = Math.sqrt(dx * dx + dy * dy);
+        targetWidth = rect.width;
+      }
+
       setCompleted(true);
       const endTime = performance.now();
-      
+
       setTimeout(() => {
         onComplete({
           completionTimeMs: Math.round(endTime - startTime),
           totalClicks: clicks + 1,
           incorrectClicks,
           cursorDistancePx: calculateCursorDistance(cursorPositions.current),
+          targetDistancePx: targetDistance,
+          targetWidthPx: targetWidth,
           success: true,
         });
       }, 800);
     } else {
       setIncorrectClicks(prev => prev + 1);
     }
-  }, [started, completed, targetButton, startTime, clicks, incorrectClicks, onComplete]);
+  },
+  [started, completed, targetButton, startTime, clicks, incorrectClicks, onComplete]
+);
 
+  const handleStart = useCallback(() => {
+    const shuffled = [...buttons].sort(() => Math.random() - 0.5);
+    setShuffledButtons(shuffled);
+    setTargetButton(shuffled[Math.floor(Math.random() * shuffled.length)]);
+    setStarted(true);
+    setStartTime(performance.now());
+  }, []);
   const handleAreaClick = useCallback(() => {
     if (started && !completed) {
       setClicks(prev => prev + 1);
@@ -75,14 +115,16 @@ export function ButtonClickTask({ task, onComplete }: TaskProps) {
 
   if (!started) {
     return (
-      <div className="flex flex-col items-center justify-center h-full space-y-6">
-        <div className="text-center space-y-2">
-          <p className="text-lg font-medium text-foreground">{task.instruction}</p>
-          <p className="text-sm text-muted-foreground">Click "Start Task" when ready</p>
+      <div className="flex h-full items-justify-center space-x-8">
+        <div className="flex flex-col items-start space-y-4 pl-12">
+          <p className="text-lg font-medium text-foreground">
+            Click "Start Task" when ready
+          </p>
+
+          <Button onClick={handleStart} size="lg">
+            Start Task
+          </Button>
         </div>
-        <Button onClick={handleStart} size="lg">
-          Start Task
-        </Button>
       </div>
     );
   }
@@ -103,19 +145,21 @@ export function ButtonClickTask({ task, onComplete }: TaskProps) {
       className="flex flex-col items-center justify-center h-full space-y-8"
       onClick={handleAreaClick}
     >
-      <p className="text-lg font-medium text-foreground">{task.instruction}</p>
+      {started && !completed && targetButton && (
+        <p className="text-lg font-medium text-foreground">
+          Click the <span className="font-semibold">{targetButton}</span> button
+        </p>
+      )}
       
-      <div 
-        className="flex gap-4 flex-wrap justify-center"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {buttons.map((label) => (
+      <div className="flex gap-4 flex-wrap justify-center">
+        {shuffledButtons.map((label) => (
           <Button
+            ref={(el) => (buttonRefs.current[label] = el)}
             key={label}
-            variant={label === targetButton ? "default" : "outline"}
+            variant="outline"
             size="lg"
             onClick={() => handleButtonClick(label)}
-            className="min-w-[120px]"
+            className="min-w-[120px] transition-colors hover:bg-muted"
           >
             {label}
           </Button>

@@ -80,6 +80,8 @@ export interface HicksTrialData {
   reactionTimeMs: number;
   correct: boolean;
   timestamp: string;
+  rangeStartIndex: number;
+  activeKeys: string[];
 }
 
 // Computed law equations

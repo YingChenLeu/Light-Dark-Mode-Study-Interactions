@@ -10,9 +10,9 @@ import {
 import { 
   generateParticipantId, 
   createConditions, 
-  createTasks 
+  createTasks,
+  predictKLMTime
 } from "@/lib/study-utils";
-import { getPredictedTimeForTask } from "@/lib/calibration-utils";
 
 interface StudyContextType {
   state: StudyState;
@@ -160,17 +160,50 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
     });
   }, [applyInterfaceMode]);
 
+  type TaskResultInput = Omit<
+    TaskResult,
+    "participantId" | "conditionLabel" | "interfaceMode" | "roomCondition" | "timestamp" | "predictedTimeMs"
+  > & {
+    targetDistancePx?: number;
+    targetWidthPx?: number;
+    totalClicks?: number;
+    targetText?: string;
+  };
+
   const recordTaskResult = useCallback((
-    result: Omit<TaskResult, "participantId" | "conditionLabel" | "interfaceMode" | "roomCondition" | "timestamp" | "predictedTimeMs">
+    result: TaskResultInput
   ) => {
     setState(prev => {
       const condition = prev.conditions[prev.currentConditionIndex];
-      const predictedTime = getPredictedTimeForTask(
-        result.taskType,
-        prev.calibrationData?.fittsEquation,
-        prev.calibrationData?.hicksEquation
-      );
-      
+      let predictedTime: number | undefined = undefined;
+
+      // Fitts + Hick (pointing tasks)
+      if (
+        result.taskType === "button-click" &&
+        prev.calibrationData?.fittsEquation &&
+        prev.calibrationData?.hicksEquation &&
+        typeof result.targetDistancePx === "number" &&
+        typeof result.targetWidthPx === "number"
+      ) {
+        const { a: fA, b: fB } = prev.calibrationData.fittsEquation;
+        const { a: hA, b: hB } = prev.calibrationData.hicksEquation;
+
+        const fittsTime = fA + fB * Math.log2(result.targetDistancePx / result.targetWidthPx + 1);
+        const hicksTime = hA + hB * Math.log2((result.totalClicks ?? 1) + 1);
+
+        predictedTime = fittsTime + hicksTime;
+      }
+
+      // KLM (form input tasks)
+      if (
+        result.taskType === "form-input" &&
+        typeof result.targetText === "string"
+      ) {
+        predictedTime = predictKLMTime({
+          characters: result.targetText.length,
+        });
+      }
+
       const fullResult: TaskResult = {
         ...result,
         participantId: prev.participantId,

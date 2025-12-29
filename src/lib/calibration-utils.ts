@@ -154,21 +154,39 @@ export function generateFittsTrials(): { width: number; distance: number }[] {
 }
 
 // Generate Hick's Law trial configurations
-export function generateHicksTrials(): { numChoices: number; targetKey: string }[] {
-  const keys = ['A', 'S', 'D', 'F'];
-  const trials: { numChoices: number; targetKey: string }[] = [];
+export function generateHicksTrials(): {
+  numChoices: number;
+  targetKey: string;
+  rangeStartIndex: number;
+}[] {
+  const allKeys = ["1", "2", "3", "4", "5", "6", "7"];
+  const trials: {
+    numChoices: number;
+    targetKey: string;
+    rangeStartIndex: number;
+  }[] = [];
 
-  // Create trials with varying number of choices
-  // When numChoices = 2, use only A and S
-  // When numChoices = 3, use A, S, D
-  // When numChoices = 4, use all keys
+  const choiceLevels = [2, 3, 4, 5, 6, 7];
 
-  for (let numChoices = 2; numChoices <= 4; numChoices++) {
-    const activeKeys = keys.slice(0, numChoices);
-    // Multiple trials per choice count for reliability
+  for (const numChoices of choiceLevels) {
     for (let rep = 0; rep < 4; rep++) {
-      const targetKey = activeKeys[Math.floor(Math.random() * activeKeys.length)];
-      trials.push({ numChoices, targetKey });
+      const rangeStartIndex = Math.floor(
+        Math.random() * (allKeys.length - numChoices + 1)
+      );
+
+      const activeKeys = allKeys.slice(
+        rangeStartIndex,
+        rangeStartIndex + numChoices
+      );
+
+      const targetKey =
+        activeKeys[Math.floor(Math.random() * activeKeys.length)];
+
+      trials.push({
+        numChoices,
+        targetKey,
+        rangeStartIndex,
+      });
     }
   }
 

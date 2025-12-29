@@ -1,5 +1,23 @@
 import { Condition, Task, TaskResult, ParticipantData, CalibrationData } from "@/types/study";
 
+export function predictKLMTime({
+  characters,
+  keystrokeTime = 0.2,
+  mentalTime = 1.35,
+  handMovementTime = 0.4,
+}: {
+  characters: number;
+  keystrokeTime?: number;
+  mentalTime?: number;
+  handMovementTime?: number;
+}): number {
+  return (
+    mentalTime +
+    handMovementTime +
+    characters * keystrokeTime
+  );
+}
+
 export function generateParticipantId(): string {
   const timestamp = Date.now().toString(36);
   const randomPart = Math.random().toString(36).substring(2, 8);
@@ -30,14 +48,12 @@ export function createTasks(): Task[] {
     {
       id: "btn-1",
       type: "button-click",
-      instruction: "Click the 'Submit' button",
-      targetValue: "Submit",
+      instruction: "Click the target button",
     },
     {
       id: "btn-2",
       type: "button-click",
-      instruction: "Click the 'Continue' button",
-      targetValue: "Continue",
+      instruction: "Click the target button",
     },
     {
       id: "drag-1",
@@ -59,8 +75,7 @@ export function createTasks(): Task[] {
     {
       id: "form-1",
       type: "form-input",
-      instruction: "Enter '42' in the input field and submit",
-      targetValue: "42",
+      instruction: "Type the shown sentence exactly and submit",
     },
   ];
   return shuffleArray(baseTasks);
@@ -79,15 +94,22 @@ export function calculateCursorDistance(movements: { x: number; y: number }[]): 
 
 export function exportToCSV(results: TaskResult[]): string {
   if (results.length === 0) return "";
-  
-  const headers = Object.keys(results[0]).join(",");
-  const rows = results.map(result => 
-    Object.values(result).map(v => 
-      typeof v === "string" ? `"${v}"` : (v === undefined ? "" : v)
-    ).join(",")
+
+  const headers = Object.keys(results[0]);
+
+  const rows = results.map(r =>
+    headers.map(key => {
+      const value = (r as any)[key];
+      if (value === undefined || value === null) return "";
+      if (typeof value === "string") return `"${value}"`;
+      return value;
+    })
   );
-  
-  return [headers, ...rows].join("\n");
+
+  return [
+    headers.join(","),
+    ...rows.map(row => row.join(","))
+  ].join("\n");
 }
 
 export function exportToJSON(

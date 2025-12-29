@@ -5,6 +5,13 @@ import { Input } from "@/components/ui/input";
 import { calculateCursorDistance } from "@/lib/study-utils";
 import { Check } from "lucide-react";
 
+const SENTENCES = [
+  "bright stars shine above",
+  "silent winds move softly",
+  "gentle waves touch shore",
+  "calm minds think clearly",
+];
+
 interface TaskProps {
   task: Task;
   onComplete: (metrics: {
@@ -26,7 +33,8 @@ export function FormInputTask({ task, onComplete }: TaskProps) {
   const [showError, setShowError] = useState(false);
   const cursorPositions = useRef<{ x: number; y: number }[]>([]);
 
-  const targetValue = task.targetValue || "42";
+  const [availableSentences, setAvailableSentences] = useState<string[]>([...SENTENCES]);
+  const [targetSentence, setTargetSentence] = useState<string | null>(null);
 
   useEffect(() => {
     if (!started) return;
@@ -43,7 +51,15 @@ export function FormInputTask({ task, onComplete }: TaskProps) {
     setStarted(true);
     setStartTime(performance.now());
     cursorPositions.current = [];
-  }, []);
+
+    if (availableSentences.length === 0) return;
+
+    const index = Math.floor(Math.random() * availableSentences.length);
+    const selected = availableSentences[index];
+
+    setTargetSentence(selected);
+    setAvailableSentences(prev => prev.filter((_, i) => i !== index));
+  }, [availableSentences]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -51,7 +67,7 @@ export function FormInputTask({ task, onComplete }: TaskProps) {
 
     setClicks(prev => prev + 1);
 
-    if (inputValue.trim() === targetValue) {
+    if (inputValue.trim() === targetSentence) {
       setCompleted(true);
       const endTime = performance.now();
       
@@ -69,7 +85,7 @@ export function FormInputTask({ task, onComplete }: TaskProps) {
       setShowError(true);
       setTimeout(() => setShowError(false), 1500);
     }
-  }, [started, completed, inputValue, targetValue, startTime, clicks, incorrectClicks, onComplete]);
+  }, [started, completed, inputValue, targetSentence, startTime, clicks, incorrectClicks, onComplete]);
 
   const handleAreaClick = useCallback(() => {
     if (started && !completed) {
@@ -107,7 +123,10 @@ export function FormInputTask({ task, onComplete }: TaskProps) {
       className="flex flex-col items-center justify-center h-full space-y-6"
       onClick={handleAreaClick}
     >
-      <p className="text-lg font-medium text-foreground">{task.instruction}</p>
+      <p className="text-lg font-medium text-foreground">
+        Type the following text exactly:
+      </p>
+      <p className="font-mono text-sm text-muted-foreground">{targetSentence}</p>
       
       <form 
         onSubmit={handleSubmit}
@@ -124,7 +143,7 @@ export function FormInputTask({ task, onComplete }: TaskProps) {
             autoComplete="off"
           />
           {showError && (
-            <p className="text-sm text-destructive">Incorrect value. Try again.</p>
+            <p className="text-sm text-destructive">Incorrect sentence. Try again.</p>
           )}
         </div>
         <Button type="submit" className="w-full">

@@ -84,7 +84,7 @@ export function ListSelectTask({ task, onComplete }: TaskProps) {
 
   if (!started) {
     return (
-      <div className="flex flex-col items-center justify-center h-full space-y-6">
+      <div className="flex flex-col items-justify-center h-full space-y-6">
         <div className="text-center space-y-2">
           <p className="text-lg font-medium text-foreground">{task.instruction}</p>
           <p className="text-sm text-muted-foreground">Click "Start Task" when ready</p>
