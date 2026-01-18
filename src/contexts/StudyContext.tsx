@@ -116,7 +116,28 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
           return { ...prev, phase: "calibration" as StudyPhase };
         
         case "calibration":
-          // This is handled by setCalibrationData
+          // Normally calibration completion is handled by setCalibrationData.
+          // In debug mode, allow skipping calibration by injecting safe default equations.
+          if (debugMode) {
+            const firstCondition = prev.conditions[0];
+            if (firstCondition) {
+              applyInterfaceMode(firstCondition.interfaceMode);
+            }
+
+            const fallbackCalibration = {
+              fittsTrials: [],
+              hicksTrials: [],
+              fittsEquation: { a: 200, b: 150, r2: 0 },
+              hicksEquation: { a: 250, b: 100, r2: 0 },
+            } as CalibrationData;
+
+            return {
+              ...prev,
+              calibrationData: prev.calibrationData ?? fallbackCalibration,
+              phase: "condition-intro" as StudyPhase,
+            };
+          }
+
           return prev;
         
         case "condition-intro":
@@ -158,12 +179,13 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
           return prev;
       }
     });
-  }, [applyInterfaceMode]);
+  }, [applyInterfaceMode, debugMode]);
 
   type TaskResultInput = Omit<
     TaskResult,
     "participantId" | "conditionLabel" | "interfaceMode" | "roomCondition" | "timestamp" | "predictedTimeMs"
   > & {
+    taskType: TaskResult["taskType"]; // ensure task type is always present
     targetDistancePx?: number;
     targetWidthPx?: number;
     totalClicks?: number;
@@ -175,11 +197,14 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
   ) => {
     setState(prev => {
       const condition = prev.conditions[prev.currentConditionIndex];
+
       let predictedTime: number | undefined = undefined;
 
-      // Fitts + Hick (pointing tasks)
+      // -------------------------------
+      // Fitts + Hick (pointing & choice tasks)
+      // -------------------------------
       if (
-        result.taskType === "button-click" &&
+        (result.taskType === "button-click" || result.taskType === "choice-reaction") &&
         prev.calibrationData?.fittsEquation &&
         prev.calibrationData?.hicksEquation &&
         typeof result.targetDistancePx === "number" &&
@@ -194,7 +219,20 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
         predictedTime = fittsTime + hicksTime;
       }
 
-      // KLM (form input tasks)
+      // -------------------------------
+      // Hick only (list selection)
+      // -------------------------------
+      if (
+        result.taskType === "list-select" &&
+        prev.calibrationData?.hicksEquation
+      ) {
+        const { a, b } = prev.calibrationData.hicksEquation;
+        predictedTime = a + b * Math.log2((result.totalClicks ?? 1) + 1);
+      }
+
+      // -------------------------------
+      // KLM (form input)
+      // -------------------------------
       if (
         result.taskType === "form-input" &&
         typeof result.targetText === "string"
@@ -213,6 +251,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
         timestamp: new Date().toISOString(),
         predictedTimeMs: predictedTime,
       };
+
       return { ...prev, results: [...prev.results, fullResult] };
     });
   }, []);
@@ -224,6 +263,84 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     applyInterfaceMode("light");
+  }, [applyInterfaceMode]);
+
+  const skipCurrent = useCallback(() => {
+    setState(prev => {
+      // If we are in a task list, skip the current task
+      if (prev.phase === "task") {
+        if (prev.currentTaskIndex < prev.tasks.length - 1) {
+          return { ...prev, currentTaskIndex: prev.currentTaskIndex + 1 };
+        }
+        return { ...prev, phase: "condition-complete" as StudyPhase };
+      }
+
+      // If we're in calibration, skip forward via the same logic as nextPhase (debug-only)
+      if (prev.phase === "calibration") {
+        const firstCondition = prev.conditions[0];
+        if (firstCondition) {
+          applyInterfaceMode(firstCondition.interfaceMode);
+        }
+
+        const fallbackCalibration = {
+          fittsTrials: [],
+          hicksTrials: [],
+          fittsEquation: { a: 200, b: 150, r2: 0 },
+          hicksEquation: { a: 250, b: 100, r2: 0 },
+        } as CalibrationData;
+
+        return {
+          ...prev,
+          calibrationData: prev.calibrationData ?? fallbackCalibration,
+          phase: "condition-intro" as StudyPhase,
+        };
+      }
+
+      // For all other phases, move forward one step.
+      // (We can't call nextPhase() here because we're inside setState; replicate the common transitions.)
+      const condition = prev.conditions[prev.currentConditionIndex];
+
+      switch (prev.phase) {
+        case "consent":
+          return { ...prev, phase: "instructions" as StudyPhase };
+
+        case "instructions":
+          applyInterfaceMode("neutral");
+          return { ...prev, phase: "calibration" as StudyPhase };
+
+        case "condition-intro":
+          return {
+            ...prev,
+            phase: "task" as StudyPhase,
+            currentTaskIndex: 0,
+            tasks: createTasks(),
+          };
+
+        case "condition-complete":
+          if (prev.currentConditionIndex < prev.conditions.length - 1) {
+            const nextCondition = prev.conditions[prev.currentConditionIndex + 1];
+            applyInterfaceMode(nextCondition.interfaceMode);
+            return {
+              ...prev,
+              phase: "condition-intro" as StudyPhase,
+              currentConditionIndex: prev.currentConditionIndex + 1,
+              currentTaskIndex: 0,
+            };
+          }
+          return {
+            ...prev,
+            phase: "completion" as StudyPhase,
+            participantData: {
+              ...prev.participantData,
+              endTime: new Date().toISOString(),
+              completed: true,
+            },
+          };
+
+        default:
+          return prev;
+      }
+    });
   }, [applyInterfaceMode]);
 
   return (
@@ -239,7 +356,28 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       resetStudy,
       setCalibrationData,
     }}>
-      {children}
+      <>
+        {children}
+        {debugMode && (
+          <button
+            onClick={skipCurrent}
+            style={{
+              position: "fixed",
+              bottom: 12,
+              right: 12,
+              zIndex: 9999,
+              padding: "8px 12px",
+              fontSize: 12,
+              borderRadius: 6,
+              border: "1px solid rgba(0,0,0,0.2)",
+              background: "#fff",
+              cursor: "pointer",
+            }}
+          >
+            Skip
+          </button>
+        )}
+      </>
     </StudyContext.Provider>
   );
 }

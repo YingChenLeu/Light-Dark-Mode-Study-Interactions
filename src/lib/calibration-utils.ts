@@ -105,7 +105,7 @@ export function getPredictedTimeForTask(
     },
     'list-select': {
       type: 'mixed',
-      params: { 
+      params: {
         fitts: { distance: 150, width: 40 },
         choices: 4 // Number of list options
       }
@@ -116,6 +116,14 @@ export function getPredictedTimeForTask(
         fitts: { distance: 100, width: 200 },
         choices: 2 // Input + submit
       }
+    },
+    "visual-search": {
+      type: "fitts",
+      params: undefined
+    },
+    "choice-reaction": {
+      type: "fitts",
+      params: undefined
     }
   };
 
@@ -136,8 +144,8 @@ export function getPredictedTimeForTask(
 
 // Generate Fitts' Law trial configurations
 export function generateFittsTrials(): { width: number; distance: number }[] {
-  const widths = [30, 60, 100]; // Target widths in pixels
-  const distances = [150, 300, 450]; // Target distances in pixels
+  const widths = [20, 40, 60, 80, 100]; // Target widths in pixels
+  const distances = [100, 200, 300, 400, 500]; // Target distances in pixels
   const trials: { width: number; distance: number }[] = [];
 
   // Create trials for each combination, with repetitions

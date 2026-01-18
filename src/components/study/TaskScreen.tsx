@@ -3,6 +3,8 @@ import { ButtonClickTask } from "./tasks/ButtonClickTask";
 import { DragDropTask } from "./tasks/DragDropTask";
 import { ListSelectTask } from "./tasks/ListSelectTask";
 import { FormInputTask } from "./tasks/FormInputTask";
+import { VisualSearchTask } from "./tasks/VisualSearchTask";
+import { ChoiceReactionTask } from "./tasks/ChoiceReactionTask";
 import { Card, CardContent } from "@/components/ui/card";
 import { useCallback } from "react";
 
@@ -36,6 +38,8 @@ export function TaskScreen() {
     "drag-drop": DragDropTask,
     "list-select": ListSelectTask,
     "form-input": FormInputTask,
+    "visual-search": VisualSearchTask,
+    "choice-reaction": ChoiceReactionTask,
   }[task.type];
 
   return (

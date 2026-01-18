@@ -115,16 +115,14 @@ export function ButtonClickTask({ task, onComplete }: TaskProps) {
 
   if (!started) {
     return (
-      <div className="flex h-full items-justify-center space-x-8">
-        <div className="flex flex-col items-start space-y-4 pl-12">
-          <p className="text-lg font-medium text-foreground">
-            Click "Start Task" when ready
-          </p>
-
-          <Button onClick={handleStart} size="lg">
-            Start Task
-          </Button>
+      <div className="flex flex-col items-center justify-center h-full space-y-6">
+        <div className="text-center space-y-2">
+          <p className="text-lg font-medium text-foreground">{task.instruction}</p>
+          <p className="text-sm text-muted-foreground">Click "Start Task" when ready</p>
         </div>
+        <Button onClick={handleStart} size="lg">
+          Start Task
+        </Button>
       </div>
     );
   }
@@ -151,7 +149,7 @@ export function ButtonClickTask({ task, onComplete }: TaskProps) {
         </p>
       )}
       
-      <div className="flex gap-4 flex-wrap justify-center">
+      <div className="flex gap-4 flex-wrap justify-center translate-y-64">
         {shuffledButtons.map((label) => (
           <Button
             ref={(el) => (buttonRefs.current[label] = el)}

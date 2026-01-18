@@ -1,5 +1,8 @@
 import { Condition, Task, TaskResult, ParticipantData, CalibrationData } from "@/types/study";
 
+// -----------------------------
+// Prediction Helpers
+// -----------------------------
 export function predictKLMTime({
   characters,
   keystrokeTime = 0.2,
@@ -11,13 +14,12 @@ export function predictKLMTime({
   mentalTime?: number;
   handMovementTime?: number;
 }): number {
-  return (
-    mentalTime +
-    handMovementTime +
-    characters * keystrokeTime
-  );
+  return mentalTime + handMovementTime + characters * keystrokeTime;
 }
 
+// -----------------------------
+// Utility helpers
+// -----------------------------
 export function generateParticipantId(): string {
   const timestamp = Date.now().toString(36);
   const randomPart = Math.random().toString(36).substring(2, 8);
@@ -33,6 +35,9 @@ export function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
+// -----------------------------
+// Study setup
+// -----------------------------
 export function createConditions(): Condition[] {
   const conditions: Condition[] = [
     { interfaceMode: "light", roomCondition: "bright", label: "Light Interface / Bright Room" },
@@ -45,42 +50,23 @@ export function createConditions(): Condition[] {
 
 export function createTasks(): Task[] {
   const baseTasks: Task[] = [
-    {
-      id: "btn-1",
-      type: "button-click",
-      instruction: "Click the target button",
-    },
-    {
-      id: "btn-2",
-      type: "button-click",
-      instruction: "Click the target button",
-    },
-    {
-      id: "drag-1",
-      type: "drag-drop",
-      instruction: "Drag the item to the target zone",
-    },
-    {
-      id: "list-1",
-      type: "list-select",
-      instruction: "Select 'Option B' from the list",
-      targetValue: "Option B",
-    },
-    {
-      id: "list-2",
-      type: "list-select",
-      instruction: "Select 'Blue' from the color options",
-      targetValue: "Blue",
-    },
-    {
-      id: "form-1",
-      type: "form-input",
-      instruction: "Type the shown sentence exactly and submit",
-    },
+    { id: "btn-1", type: "button-click", instruction: "Click the target button"},
+    { id: "btn-2", type: "button-click", instruction: "Click the target button"},
+    { id: "drag-1", type: "drag-drop", instruction: "Drag the item to the target zone" },
+    { id: "list-1", type: "list-select", instruction: "Select 'Option B' from the list", targetValue: "Option B" },
+    { id: "list-2", type: "list-select", instruction: "Select 'Blue' from the color options", targetValue: "Blue" },
+    { id: "form-1", type: "form-input", instruction: "Type the shown sentence exactly and submit" },
+    { id: "visual-1", type: "visual-search", instruction: "Find and click the target symbol" },
+    { id: "visual-2", type: "visual-search", instruction: "Find and click the target symbol" },
+    { id: "choice-1", type: "choice-reaction", instruction: "Press SPACE when the target shape appears" },
+    { id: "choice-2", type: "choice-reaction", instruction: "Press SPACE when the target shape appears" },
   ];
   return shuffleArray(baseTasks);
 }
 
+// -----------------------------
+// Measurement helpers
+// -----------------------------
 export function calculateCursorDistance(movements: { x: number; y: number }[]): number {
   if (movements.length < 2) return 0;
   let distance = 0;
@@ -92,46 +78,50 @@ export function calculateCursorDistance(movements: { x: number; y: number }[]): 
   return Math.round(distance);
 }
 
+// -----------------------------
+// Export helpers
+// -----------------------------
 export function exportToCSV(results: TaskResult[]): string {
   if (results.length === 0) return "";
 
   const headers = Object.keys(results[0]);
 
+  const escapeCSV = (v: unknown) => {
+    if (v === undefined || v === null) return "";
+    const s = String(v);
+    if (/[\n\r,\"]/g.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+
   const rows = results.map(r =>
-    headers.map(key => {
-      const value = (r as any)[key];
-      if (value === undefined || value === null) return "";
-      if (typeof value === "string") return `"${value}"`;
-      return value;
-    })
+    headers.map(h => escapeCSV((r as any)[h])).join(",")
   );
 
-  return [
-    headers.join(","),
-    ...rows.map(row => row.join(","))
-  ].join("\n");
+  return [headers.join(","), ...rows].join("\n");
 }
 
 export function exportToJSON(
-  results: TaskResult[], 
+  results: TaskResult[],
   participantData: ParticipantData,
   calibrationData?: CalibrationData
 ): string {
   return JSON.stringify({
     participant: participantData,
-    calibration: calibrationData ? {
-      fittsEquation: calibrationData.fittsEquation,
-      hicksEquation: calibrationData.hicksEquation,
-      fittsTrialsCount: calibrationData.fittsTrials.length,
-      hicksTrialsCount: calibrationData.hicksTrials.length,
-    } : null,
-    results: results,
+    calibration: calibrationData
+      ? {
+          fittsEquation: calibrationData.fittsEquation,
+          hicksEquation: calibrationData.hicksEquation,
+          fittsTrialsCount: calibrationData.fittsTrials.length,
+          hicksTrialsCount: calibrationData.hicksTrials.length,
+        }
+      : null,
+    results,
   }, null, 2);
 }
 
 export function exportCalibrationToCSV(calibrationData: CalibrationData): string {
   const fittsHeaders = "trialType,trialIndex,targetWidth,targetDistance,indexOfDifficulty,movementTimeMs,success,timestamp";
-  const fittsRows = calibrationData.fittsTrials.map(t => 
+  const fittsRows = calibrationData.fittsTrials.map(t =>
     `fitts,${t.trialIndex},${t.targetWidth},${t.targetDistance},${t.indexOfDifficulty.toFixed(3)},${t.movementTimeMs},${t.success},"${t.timestamp}"`
   );
 
@@ -143,7 +133,7 @@ export function exportCalibrationToCSV(calibrationData: CalibrationData): string
   const equationSummary = [
     "",
     "# Fitts' Law Equation: MT = a + b * log2(D/W + 1)",
-    calibrationData.fittsEquation 
+    calibrationData.fittsEquation
       ? `# a=${calibrationData.fittsEquation.a.toFixed(2)}, b=${calibrationData.fittsEquation.b.toFixed(2)}, R²=${calibrationData.fittsEquation.r2.toFixed(3)}`
       : "# Not computed",
     "",
@@ -158,10 +148,10 @@ export function exportCalibrationToCSV(calibrationData: CalibrationData): string
     fittsHeaders,
     ...fittsRows,
     "",
-    "# Hick's Law Trials", 
+    "# Hick's Law Trials",
     hicksHeaders,
     ...hicksRows,
-    ...equationSummary
+    ...equationSummary,
   ].join("\n");
 }
 

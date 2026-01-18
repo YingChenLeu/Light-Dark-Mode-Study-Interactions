@@ -7,7 +7,13 @@ export interface Condition {
   label: string;
 }
 
-export type TaskType = "button-click" | "drag-drop" | "list-select" | "form-input";
+export type TaskType =
+  | "button-click"
+  | "drag-drop"
+  | "list-select"
+  | "form-input"
+  | "visual-search"
+  | "choice-reaction";
 
 export interface Task {
   id: string;
@@ -30,6 +36,7 @@ export interface TaskResult {
   success: boolean;
   timestamp: string;
   predictedTimeMs?: number;
+  targetText?: string;
 }
 
 export interface ParticipantData {

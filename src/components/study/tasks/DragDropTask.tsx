@@ -27,6 +27,7 @@ export function DragDropTask({ task, onComplete }: TaskProps) {
   const cursorPositions = useRef<{ x: number; y: number }[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
+  const lastYPosition = useRef<number>(200);
 
   const targetZone = { x: 400, y: 180, width: 120, height: 120 };
   const itemSize = 60;
@@ -64,6 +65,7 @@ export function DragDropTask({ task, onComplete }: TaskProps) {
         setIsDragging(false);
         if (isInTarget && !completed) {
           setCompleted(true);
+          lastYPosition.current = 200;
           const endTime = performance.now();
           
           setTimeout(() => {
@@ -91,6 +93,23 @@ export function DragDropTask({ task, onComplete }: TaskProps) {
     setStarted(true);
     setStartTime(performance.now());
     cursorPositions.current = [];
+
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+
+      const minY = lastYPosition.current + 40;
+      const maxY = rect.height - itemSize;
+
+      const newY = Math.min(
+        maxY,
+        Math.max(minY, Math.random() * maxY)
+      );
+
+      const newX = Math.random() * (rect.width - itemSize);
+
+      lastYPosition.current = newY;
+      setItemPosition({ x: newX, y: newY });
+    }
   }, []);
 
   const handleItemMouseDown = useCallback((e: React.MouseEvent) => {
@@ -143,9 +162,9 @@ export function DragDropTask({ task, onComplete }: TaskProps) {
     <div className="flex flex-col items-center h-full space-y-4 pt-4">
       <p className="text-lg font-medium text-foreground">{task.instruction}</p>
       
-      <div 
+      <div
         ref={containerRef}
-        className="relative w-full max-w-[600px] h-[400px] bg-secondary rounded-lg border border-border"
+        className="relative w-full max-w-[800px] h-[600px] bg-secondary rounded-lg border border-border"
         onClick={handleAreaClick}
       >
         {/* Target zone */}
