@@ -11,12 +11,13 @@ interface TaskProps {
     incorrectClicks: number;
     cursorDistancePx: number;
     success: boolean;
+    distractorCount: number;
+    startCursorPos?: { x: number; y: number } | null;
+    targetPos?: { x: number; y: number } | null;
   }) => void;
 }
 
 const SYMBOLS = ["●", "■", "▲", "◆", "★", "○", "□", "△", "◇", "☆"];
-const getRandomTargetSymbol = () =>
-  SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
 const DISTRACTOR_COUNTS = [4, 8, 12, 16];
 const GRID_SIZE = 400;
 const CELL_SIZE = 60;
@@ -61,22 +62,29 @@ export function VisualSearchTask({ task, onComplete }: TaskProps) {
   const [incorrectClicks, setIncorrectClicks] = useState(0);
   const [distractorCount, setDistractorCount] = useState(8);
   const [symbols, setSymbols] = useState<{ symbol: string; x: number; y: number; isTarget: boolean }[]>([]);
-  const [targetSymbol, setTargetSymbol] = useState<string>("★");
+  const [targetSymbol, setTargetSymbol] = useState<string>("");
   
   const cursorPositionsRef = useRef<{ x: number; y: number }[]>([]);
+  const targetPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const handleStart = useCallback(() => {
     const count = DISTRACTOR_COUNTS[Math.floor(Math.random() * DISTRACTOR_COUNTS.length)];
-    const target = getRandomTargetSymbol();
+    const target =
+      typeof task.targetValue === "string" && SYMBOLS.includes(task.targetValue)
+        ? task.targetValue
+        : SYMBOLS[0];
     setTargetSymbol(target);
     setDistractorCount(count);
-    setSymbols(generateSymbolPositions(count, target));
+    const positions = generateSymbolPositions(count, target);
+    setSymbols(positions);
+    const targetPos = positions.find(pos => pos.isTarget);
+    targetPosRef.current = targetPos ? { x: targetPos.x, y: targetPos.y } : null;
     setPhase("active");
     setStartTime(performance.now());
     setClicks(0);
     setIncorrectClicks(0);
     cursorPositionsRef.current = [];
-  }, []);
+  }, [task]);
 
   const handleSymbolClick = useCallback((isTarget: boolean) => {
     if (phase !== "active") return;
@@ -85,14 +93,23 @@ export function VisualSearchTask({ task, onComplete }: TaskProps) {
 
     if (isTarget) {
       const endTime = performance.now();
+      const completionTimeMs = Math.round(endTime - startTime);
+
+      const startCursorPos = cursorPositionsRef.current.length > 0
+        ? cursorPositionsRef.current[0]
+        : null;
+
       setPhase("complete");
-      
+
       onComplete({
-        completionTimeMs: Math.round(endTime - startTime),
+        completionTimeMs,
         totalClicks: clicks + 1,
         incorrectClicks,
         cursorDistancePx: calculateCursorDistance(cursorPositionsRef.current),
         success: true,
+        distractorCount,
+        startCursorPos,
+        targetPos: targetPosRef.current,
       });
     } else {
       setIncorrectClicks(prev => prev + 1);
@@ -123,7 +140,7 @@ export function VisualSearchTask({ task, onComplete }: TaskProps) {
           {task.instruction || `Find and click the target symbol: ${targetSymbol}`}
         </p>
         <p className="text-sm text-muted-foreground text-center">
-          Multiple symbols will appear. Click the star (★) as quickly as possible.
+          Multiple symbols will appear. Click the {targetSymbol} symbol as quickly as possible.
         </p>
         <Button onClick={handleStart} size="lg">
           Start Task

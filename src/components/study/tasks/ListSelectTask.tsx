@@ -37,11 +37,14 @@ export function ListSelectTask({ task, onComplete }: TaskProps) {
   const cursorPositions = useRef<{ x: number; y: number }[]>([]);
   const startPosition = useRef<{ x: number; y: number } | null>(null);
 
+  const COLOR_OPTIONS = ["Red", "Green", "Blue", "Yellow", "Purple"];
+  const LETTER_OPTIONS = ["Option A", "Option B", "Option C", "Option D"];
+
   const getListItems = () => {
-    if (task.targetValue === "Blue") {
-      return ["Red", "Green", "Blue", "Yellow", "Purple"];
+    if (task.targetValue && COLOR_OPTIONS.includes(task.targetValue)) {
+      return COLOR_OPTIONS;
     }
-    return ["Option A", "Option B", "Option C", "Option D"];
+    return LETTER_OPTIONS;
   };
 
   const targetItem = task.targetValue || "Option B";

@@ -24,7 +24,10 @@ export function ButtonClickTask({ task, onComplete }: TaskProps) {
   const calibration = state.calibrationData;
 
   const buttons = ["Cancel", "Submit", "Continue", "Reset"];
-  const [targetButton, setTargetButton] = useState<string | null>(null);
+  const targetButton =
+    task.targetValue && buttons.includes(task.targetValue)
+      ? task.targetValue
+      : null;
   const [shuffledButtons, setShuffledButtons] = useState<string[]>([]);
   const [started, setStarted] = useState(false);
   const [completed, setCompleted] = useState(false);
@@ -41,10 +44,6 @@ export function ButtonClickTask({ task, onComplete }: TaskProps) {
     if (!started) return;
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!startPosition.current) {
-        startPosition.current = { x: e.clientX, y: e.clientY };
-      }
-
       cursorPositions.current.push({ x: e.clientX, y: e.clientY });
     };
 
@@ -78,13 +77,15 @@ export function ButtonClickTask({ task, onComplete }: TaskProps) {
         targetWidth = rect.width;
       }
 
+      window.removeEventListener("mousemove", () => {});
+
       setCompleted(true);
       const endTime = performance.now();
 
       setTimeout(() => {
         onComplete({
           completionTimeMs: Math.round(endTime - startTime),
-          totalClicks: clicks + 1,
+          totalClicks: clicks,
           incorrectClicks,
           cursorDistancePx: calculateCursorDistance(cursorPositions.current),
           targetDistancePx: targetDistance,
@@ -102,16 +103,25 @@ export function ButtonClickTask({ task, onComplete }: TaskProps) {
   const handleStart = useCallback(() => {
     const shuffled = [...buttons].sort(() => Math.random() - 0.5);
     setShuffledButtons(shuffled);
-    setTargetButton(shuffled[Math.floor(Math.random() * shuffled.length)]);
     setStarted(true);
     setStartTime(performance.now());
+    startPosition.current = null;
+    cursorPositions.current = [];
+    startPosition.current = {
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+    };
   }, []);
-  const handleAreaClick = useCallback(() => {
-    if (started && !completed) {
-      setClicks(prev => prev + 1);
-      setIncorrectClicks(prev => prev + 1);
-    }
-  }, [started, completed]);
+
+  if (!targetButton) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-sm text-muted-foreground">
+          Invalid task configuration.
+        </p>
+      </div>
+    );
+  }
 
   if (!started) {
     return (
@@ -139,10 +149,7 @@ export function ButtonClickTask({ task, onComplete }: TaskProps) {
   }
 
   return (
-    <div 
-      className="flex flex-col items-center justify-center h-full space-y-8"
-      onClick={handleAreaClick}
-    >
+    <div className="flex flex-col items-center justify-center h-full space-y-8">
       {started && !completed && targetButton && (
         <p className="text-lg font-medium text-foreground">
           Click the <span className="font-semibold">{targetButton}</span> button

@@ -12,6 +12,11 @@ interface TaskProps {
     incorrectClicks: number;
     cursorDistancePx: number;
     success: boolean;
+
+    acquireDistancePx: number;
+    acquireWidthPx: number;
+    dragDistancePx: number;
+    dropWidthPx: number;
   }) => void;
 }
 
@@ -28,6 +33,12 @@ export function DragDropTask({ task, onComplete }: TaskProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
   const lastYPosition = useRef<number>(200);
+
+  const acquireStartPos = useRef<{ x: number; y: number } | null>(null);
+  const itemStartPos = useRef<{ x: number; y: number } | null>(null);
+
+  const acquireDistancePx = useRef<number>(0);
+  const dragDistancePx = useRef<number>(0);
 
   const targetZone = { x: 400, y: 180, width: 120, height: 120 };
   const itemSize = 60;
@@ -67,6 +78,16 @@ export function DragDropTask({ task, onComplete }: TaskProps) {
           setCompleted(true);
           lastYPosition.current = 200;
           const endTime = performance.now();
+
+          if (itemStartPos.current) {
+            const targetCenterX = targetZone.x + targetZone.width / 2;
+            const targetCenterY = targetZone.y + targetZone.height / 2;
+
+            dragDistancePx.current = Math.hypot(
+              itemStartPos.current.x - targetCenterX,
+              itemStartPos.current.y - targetCenterY
+            );
+          }
           
           setTimeout(() => {
             onComplete({
@@ -75,6 +96,12 @@ export function DragDropTask({ task, onComplete }: TaskProps) {
               incorrectClicks,
               cursorDistancePx: calculateCursorDistance(cursorPositions.current),
               success: true,
+
+              // Fitts phase metrics
+              acquireDistancePx: acquireDistancePx.current,
+              acquireWidthPx: itemSize,
+              dragDistancePx: dragDistancePx.current,
+              dropWidthPx: targetZone.width,
             });
           }, 800);
         }
@@ -93,6 +120,11 @@ export function DragDropTask({ task, onComplete }: TaskProps) {
     setStarted(true);
     setStartTime(performance.now());
     cursorPositions.current = [];
+
+    acquireStartPos.current = null;
+    itemStartPos.current = null;
+    acquireDistancePx.current = 0;
+    dragDistancePx.current = 0;
 
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
@@ -115,6 +147,20 @@ export function DragDropTask({ task, onComplete }: TaskProps) {
   const handleItemMouseDown = useCallback((e: React.MouseEvent) => {
     if (!started || completed) return;
     e.preventDefault();
+
+    if (!acquireStartPos.current) {
+      acquireStartPos.current = { x: e.clientX, y: e.clientY };
+
+      const itemCenterX = itemPosition.x + itemSize / 2;
+      const itemCenterY = itemPosition.y + itemSize / 2;
+
+      acquireDistancePx.current = Math.hypot(
+        acquireStartPos.current.x - itemCenterX,
+        acquireStartPos.current.y - itemCenterY
+      );
+
+      itemStartPos.current = { x: itemCenterX, y: itemCenterY };
+    }
     
     const rect = (e.target as HTMLElement).getBoundingClientRect();
     dragOffset.current = {
@@ -124,7 +170,7 @@ export function DragDropTask({ task, onComplete }: TaskProps) {
     
     setIsDragging(true);
     setClicks(prev => prev + 1);
-  }, [started, completed]);
+  }, [started, completed, itemPosition]);
 
   const handleAreaClick = useCallback(() => {
     if (started && !completed && !isDragging) {

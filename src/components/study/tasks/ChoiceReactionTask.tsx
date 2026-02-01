@@ -30,8 +30,10 @@ export function ChoiceReactionTask({ task, onComplete }: TaskProps) {
   const [targetShape, setTargetShape] = useState<typeof SHAPES[0] | null>(null);
   const [incorrectPresses, setIncorrectPresses] = useState(0);
   const [totalPresses, setTotalPresses] = useState(0);
+  const [distractorId, setDistractorId] = useState<string | null>(null);
   
   const stimulusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const distractorIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleStart = useCallback(() => {
     // Random number of choices
@@ -43,21 +45,40 @@ export function ChoiceReactionTask({ task, onComplete }: TaskProps) {
     const choices = shuffledShapes.slice(0, count);
     setActiveChoices(choices);
     
-    // Pick target
-    const target = choices[Math.floor(Math.random() * choices.length)];
-    setTargetShape(target);
+    // Pick target from task.targetValue
+    const targetFromTask = choices.find(
+      s => s.id === task.targetValue
+    ) || choices[0];
+
+    setTargetShape(targetFromTask);
     
     setPhase("waiting");
     setIncorrectPresses(0);
     setTotalPresses(0);
 
+    // Start random distractor flashes during waiting phase
+    distractorIntervalRef.current = setInterval(() => {
+      setDistractorId(prev => {
+        const nonTargets = choices.filter(s => s.id !== targetFromTask.id);
+        if (nonTargets.length === 0) return null;
+        const randomDistractor =
+          nonTargets[Math.floor(Math.random() * nonTargets.length)];
+        return randomDistractor.id;
+      });
+    }, 300 + Math.random() * 400);
+
     // Random delay before showing stimulus (1-3 seconds)
     const delay = 1000 + Math.random() * 2000;
     stimulusTimeoutRef.current = setTimeout(() => {
+      if (distractorIntervalRef.current) {
+        clearInterval(distractorIntervalRef.current);
+        distractorIntervalRef.current = null;
+      }
+      setDistractorId(null);
       setPhase("stimulus");
       setStartTime(performance.now());
     }, delay);
-  }, []);
+  }, [task]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.code !== "Space") return;
@@ -94,6 +115,9 @@ export function ChoiceReactionTask({ task, onComplete }: TaskProps) {
     return () => {
       if (stimulusTimeoutRef.current) {
         clearTimeout(stimulusTimeoutRef.current);
+      }
+      if (distractorIntervalRef.current) {
+        clearInterval(distractorIntervalRef.current);
       }
     };
   }, []);
@@ -145,6 +169,8 @@ export function ChoiceReactionTask({ task, onComplete }: TaskProps) {
             className={`text-5xl transition-all duration-150 ${
               phase === "stimulus" && targetShape?.id === shape.id
                 ? "scale-150 animate-pulse"
+                : phase === "waiting" && distractorId === shape.id
+                ? "scale-125 opacity-100 animate-pulse"
                 : "opacity-40"
             }`}
             style={{ color: shape.color }}
@@ -166,6 +192,9 @@ export function ChoiceReactionTask({ task, onComplete }: TaskProps) {
         )}
         <p className="text-xs text-muted-foreground">
           Choices: {numChoices}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Accidental presses: {incorrectPresses}
         </p>
       </div>
     </div>

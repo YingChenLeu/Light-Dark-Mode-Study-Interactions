@@ -1,3 +1,37 @@
+function randomFrom<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function generateTargetValue(type: Task["type"]): string | undefined {
+  switch (type) {
+    case "list-select": {
+      const optionSets = [
+        ["Option A", "Option B", "Option C", "Option D"],
+        ["Red", "Green", "Blue", "Yellow", "Purple"],
+      ];
+      const set = randomFrom(optionSets);
+      return randomFrom(set);
+    }
+
+    case "button-click":
+      return randomFrom(["Cancel", "Submit", "Continue", "Reset"]);
+
+    case "drag-drop":
+      return "target-zone";
+
+    case "visual-search":
+      return randomFrom(["●", "■", "▲", "◆", "★", "○", "□", "△", "◇", "☆"]);
+
+    case "choice-reaction":
+      return randomFrom(["circle", "square", "triangle", "diamond", "star"]);
+
+    case "form-input":
+      return undefined;
+
+    default:
+      return undefined;
+  }
+}
 import { Condition, Task, TaskResult, ParticipantData, CalibrationData } from "@/types/study";
 
 // -----------------------------
@@ -50,17 +84,51 @@ export function createConditions(): Condition[] {
 
 export function createTasks(): Task[] {
   const baseTasks: Task[] = [
-    { id: "btn-1", type: "button-click", instruction: "Click the target button"},
-    { id: "btn-2", type: "button-click", instruction: "Click the target button"},
-    { id: "drag-1", type: "drag-drop", instruction: "Drag the item to the target zone" },
-    { id: "list-1", type: "list-select", instruction: "Select 'Option B' from the list", targetValue: "Option B" },
-    { id: "list-2", type: "list-select", instruction: "Select 'Blue' from the color options", targetValue: "Blue" },
-    { id: "form-1", type: "form-input", instruction: "Type the shown sentence exactly and submit" },
-    { id: "visual-1", type: "visual-search", instruction: "Find and click the target symbol" },
-    { id: "visual-2", type: "visual-search", instruction: "Find and click the target symbol" },
-    { id: "choice-1", type: "choice-reaction", instruction: "Press SPACE when the target shape appears" },
-    { id: "choice-2", type: "choice-reaction", instruction: "Press SPACE when the target shape appears" },
-  ];
+    { id: "btn-1", type: "button-click" as const, instruction: "Click the target button" },
+    { id: "btn-2", type: "button-click" as const, instruction: "Click the target button" },
+    { id: "drag-1", type: "drag-drop" as const, instruction: "Drag the item to the target zone" },
+    { id: "list-1", type: "list-select" as const, instruction: "Select the target item from the list" },
+    { id: "list-2", type: "list-select" as const, instruction: "Select the target item from the list" },
+    { id: "form-1", type: "form-input" as const, instruction: "Type the shown sentence exactly and submit" },
+    { id: "visual-1", type: "visual-search" as const, instruction: "Find and click the target symbol" },
+    { id: "visual-2", type: "visual-search" as const, instruction: "Find and click the target symbol" },
+    { id: "choice-1", type: "choice-reaction" as const, instruction: "Press SPACE when the target shape appears" },
+    { id: "choice-2", type: "choice-reaction" as const, instruction: "Press SPACE when the target shape appears" },
+  ].map(task => {
+    const targetValue = generateTargetValue(task.type);
+
+    let instruction = task.instruction;
+
+    if (targetValue) {
+      switch (task.type) {
+        case "button-click":
+          instruction = `Click the ${targetValue} button`;
+          break;
+
+        case "list-select":
+          instruction = `Select "${targetValue}" from the list`;
+          break;
+
+        case "choice-reaction":
+          instruction = `Press SPACE when the ${targetValue} shape appears`;
+          break;
+
+        case "drag-drop":
+          instruction = "Drag the item to the highlighted target zone";
+          break;
+
+        case "visual-search":
+          instruction = "Find and click the highlighted target symbol";
+          break;
+      }
+    }
+
+    return {
+      ...task,
+      targetValue,
+      instruction,
+    };
+  });
   return shuffleArray(baseTasks);
 }
 

@@ -201,10 +201,44 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       let predictedTime: number | undefined = undefined;
 
       // -------------------------------
+      // Fitts (drag & drop: acquire + transport)
+      // -------------------------------
+      if (
+        result.taskType === "drag-drop" &&
+        prev.calibrationData?.fittsEquation &&
+        typeof (result as any).acquireDistancePx === "number" &&
+        typeof (result as any).acquireWidthPx === "number" &&
+        typeof (result as any).dragDistancePx === "number" &&
+        typeof (result as any).dropWidthPx === "number"
+      ) {
+        const { a, b } = prev.calibrationData.fittsEquation;
+
+        const acquireTime =
+          a +
+          b *
+            Math.log2(
+              (result as any).acquireDistancePx /
+                (result as any).acquireWidthPx +
+                1
+            );
+
+        const dragTime =
+          a +
+          b *
+            Math.log2(
+              (result as any).dragDistancePx /
+                (result as any).dropWidthPx +
+                1
+            );
+
+        predictedTime = acquireTime + dragTime;
+      }
+
+      // -------------------------------
       // Fitts + Hick (pointing & choice tasks)
       // -------------------------------
       if (
-        (result.taskType === "button-click" || result.taskType === "choice-reaction") &&
+        result.taskType === "button-click" &&
         prev.calibrationData?.fittsEquation &&
         prev.calibrationData?.hicksEquation &&
         typeof result.targetDistancePx === "number" &&
@@ -220,14 +254,36 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       }
 
       // -------------------------------
-      // Hick only (list selection)
+      // Hick only (choice reaction)
       // -------------------------------
       if (
-        result.taskType === "list-select" &&
+        result.taskType === "choice-reaction" &&
         prev.calibrationData?.hicksEquation
       ) {
         const { a, b } = prev.calibrationData.hicksEquation;
         predictedTime = a + b * Math.log2((result.totalClicks ?? 1) + 1);
+      }
+
+      // -------------------------------
+      // Fitts + Hick (list selection)
+      // -------------------------------
+      if (
+        result.taskType === "list-select" &&
+        prev.calibrationData?.fittsEquation &&
+        prev.calibrationData?.hicksEquation &&
+        typeof result.targetDistancePx === "number" &&
+        typeof result.targetWidthPx === "number"
+      ) {
+        const { a: fA, b: fB } = prev.calibrationData.fittsEquation;
+        const { a: hA, b: hB } = prev.calibrationData.hicksEquation;
+
+        const fittsTime =
+          fA + fB * Math.log2(result.targetDistancePx / result.targetWidthPx + 1);
+
+        const hicksTime =
+          hA + hB * Math.log2((result.totalClicks ?? 1) + 1);
+
+        predictedTime = fittsTime + hicksTime;
       }
 
       // -------------------------------
@@ -242,6 +298,42 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
         });
       }
 
+      // -------------------------------
+      // Visual search (search slope metric)
+      // -------------------------------
+      if (
+        result.taskType === "visual-search" &&
+        typeof result.completionTimeMs === "number" &&
+        typeof (result as any).distractorCount === "number" &&
+        (result as any).distractorCount > 0
+      ) {
+        // Leave predictedTime undefined for visual search
+        predictedTime = undefined;
+      }
+
+      let efficiency: number | undefined = undefined;
+
+      // Default efficiency (predicted / actual)
+      if (
+        typeof predictedTime === "number" &&
+        typeof result.completionTimeMs === "number" &&
+        result.completionTimeMs > 0
+      ) {
+        efficiency = predictedTime / result.completionTimeMs;
+      }
+
+      // Visual search efficiency: (time - 100ms) / distractor count
+      if (
+        result.taskType === "visual-search" &&
+        typeof result.completionTimeMs === "number" &&
+        typeof (result as any).distractorCount === "number" &&
+        (result as any).distractorCount > 0
+      ) {
+        efficiency =
+          (result.completionTimeMs - 100) /
+          (result as any).distractorCount;
+      }
+
       const fullResult: TaskResult = {
         ...result,
         participantId: prev.participantId,
@@ -250,6 +342,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
         roomCondition: condition?.roomCondition || "bright",
         timestamp: new Date().toISOString(),
         predictedTimeMs: predictedTime,
+        efficiency: efficiency,
       };
 
       return { ...prev, results: [...prev.results, fullResult] };

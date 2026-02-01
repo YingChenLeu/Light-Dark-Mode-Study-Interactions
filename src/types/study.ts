@@ -37,6 +37,7 @@ export interface TaskResult {
   timestamp: string;
   predictedTimeMs?: number;
   targetText?: string;
+  efficiency?: number;
 }
 
 export interface ParticipantData {
