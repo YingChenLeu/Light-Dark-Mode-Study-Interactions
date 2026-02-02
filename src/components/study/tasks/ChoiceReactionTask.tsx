@@ -126,10 +126,14 @@ export function ChoiceReactionTask({ task, onComplete }: TaskProps) {
     return (
       <div className="flex flex-col items-center justify-start h-full space-y-6 pt-24">
         <p className="text-lg text-foreground text-center max-w-md">
-          {task.instruction || "Press SPACE when you see the target shape appear"}
+          {task.instruction || (
+            targetShape
+              ? `Press SPACE when you see the ${targetShape.id} appear`
+              : "Press SPACE when you see the target shape appear"
+          )}
         </p>
         <p className="text-sm text-muted-foreground text-center max-w-md">
-          You will see several possible shapes. When the target shape is highlighted, 
+          You will see several possible shapes. When the target ({targetShape?.label}) is highlighted,
           press SPACE as quickly as possible.
         </p>
         <Button onClick={handleStart} size="lg">

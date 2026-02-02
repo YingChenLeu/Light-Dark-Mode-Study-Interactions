@@ -40,6 +40,12 @@ export function ListSelectTask({ task, onComplete }: TaskProps) {
   const COLOR_OPTIONS = ["Red", "Green", "Blue", "Yellow", "Purple"];
   const LETTER_OPTIONS = ["Option A", "Option B", "Option C", "Option D"];
 
+  const ALL_OPTIONS = [...COLOR_OPTIONS, ...LETTER_OPTIONS];
+  const targetItem =
+    task.targetValue && ALL_OPTIONS.includes(task.targetValue)
+      ? task.targetValue
+      : null;
+
   const getListItems = () => {
     if (task.targetValue && COLOR_OPTIONS.includes(task.targetValue)) {
       return COLOR_OPTIONS;
@@ -47,80 +53,94 @@ export function ListSelectTask({ task, onComplete }: TaskProps) {
     return LETTER_OPTIONS;
   };
 
-  const targetItem = task.targetValue || "Option B";
-
   useEffect(() => {
-    if (!started) return;
+    if (!started || completed) return;
 
     const handleMouseMove = (e: MouseEvent) => {
       cursorPositions.current.push({ x: e.clientX, y: e.clientY });
     };
 
     window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [started]);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+    };
+  }, [started, completed]);
 
   const handleStart = useCallback(() => {
     setStarted(true);
     setStartTime(performance.now());
-    const handleFirstMove = (e: MouseEvent) => {
-      startPosition.current = { x: e.clientX, y: e.clientY };
-      window.removeEventListener("mousemove", handleFirstMove);
-    };
-    window.addEventListener("mousemove", handleFirstMove);
+
     cursorPositions.current = [];
+    startPosition.current = null;
+
+    const recordInitialPosition = (e: MouseEvent) => {
+      startPosition.current = { x: e.clientX, y: e.clientY };
+      window.removeEventListener("mousemove", recordInitialPosition);
+    };
+
+    window.addEventListener("mousemove", recordInitialPosition, { once: true });
+
     setShuffledItems(shuffleArray(getListItems()));
-  }, []);
+  }, [task.targetValue]);
 
   const handleItemClick = useCallback((item: string) => {
     if (!started || completed) return;
 
-    setClicks(prev => prev + 1);
-    setSelectedItem(item);
+    setClicks(prevClicks => {
+      const newClicks = prevClicks + 1;
+      setSelectedItem(item);
 
-    if (item === targetItem) {
-      setCompleted(true);
-      const endTime = performance.now();
-      
-      setTimeout(() => {
+      if (item === targetItem) {
+        // Capture target distance/width synchronously before re-render unmounts the list
         const el = document.getElementById(`item-${item}`);
-        let targetDistance = 0;
-        let targetWidth = 0;
-
-        if (el && startPosition.current) {
+        let targetDistance: number | null = null;
+        let targetWidth: number | null = null;
+        if (el && startPosition.current !== null) {
           const rect = el.getBoundingClientRect();
           const centerX = rect.left + rect.width / 2;
           const centerY = rect.top + rect.height / 2;
-
           targetDistance = Math.hypot(
             centerX - startPosition.current.x,
             centerY - startPosition.current.y
           );
-
           targetWidth = rect.width;
         }
 
-        onComplete({
-          completionTimeMs: Math.round(endTime - startTime),
-          totalClicks: clicks + 1,
-          incorrectClicks,
-          cursorDistancePx: calculateCursorDistance(cursorPositions.current),
-          targetDistancePx: targetDistance,
-          targetWidthPx: targetWidth,
-          success: true,
-        });
-      }, 800);
-    } else {
-      setIncorrectClicks(prev => prev + 1);
-    }
-  }, [started, completed, targetItem, startTime, clicks, incorrectClicks, onComplete]);
+        const endTime = performance.now();
+        const completionTimeMs = Math.round(endTime - startTime);
+        const incorrectClicksValue = incorrectClicks;
 
-  const handleAreaClick = useCallback(() => {
-    if (started && !completed) {
-      setClicks(prev => prev + 1);
-      setIncorrectClicks(prev => prev + 1);
-    }
-  }, [started, completed]);
+        setCompleted(true);
+
+        setTimeout(() => {
+          onComplete({
+            completionTimeMs,
+            totalClicks: newClicks,
+            incorrectClicks: incorrectClicksValue,
+            cursorDistancePx: calculateCursorDistance(cursorPositions.current),
+            targetDistancePx: targetDistance ?? undefined,
+            targetWidthPx: targetWidth ?? undefined,
+            success: true,
+          });
+        }, 800);
+      } else {
+        setIncorrectClicks(prev => prev + 1);
+      }
+
+      return newClicks;
+    });
+  }, [started, completed, targetItem, startTime, incorrectClicks, onComplete, shuffledItems.length]);
+
+  if (!targetItem) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-sm text-muted-foreground">
+          Invalid task configuration.
+        </p>
+      </div>
+    );
+  }
 
   if (!started) {
     return (
@@ -150,7 +170,6 @@ export function ListSelectTask({ task, onComplete }: TaskProps) {
   return (
     <div 
       className="flex flex-col items-center justify-center h-full space-y-6"
-      onClick={handleAreaClick}
     >
       <p className="text-lg font-medium text-foreground">{task.instruction}</p>
       

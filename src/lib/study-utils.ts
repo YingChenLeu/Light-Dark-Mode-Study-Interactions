@@ -37,18 +37,15 @@ import { Condition, Task, TaskResult, ParticipantData, CalibrationData } from "@
 // -----------------------------
 // Prediction Helpers
 // -----------------------------
+/** (characters + 1) × keystrokeTime in milliseconds; keystrokeTime in seconds (default 0.2). */
 export function predictKLMTime({
   characters,
-  keystrokeTime = 0.2,
-  mentalTime = 1.35,
-  handMovementTime = 0.4,
+  keystrokeTimeSeconds = 0.2,
 }: {
   characters: number;
-  keystrokeTime?: number;
-  mentalTime?: number;
-  handMovementTime?: number;
+  keystrokeTimeSeconds?: number;
 }): number {
-  return mentalTime + handMovementTime + characters * keystrokeTime;
+  return (characters + 1) * keystrokeTimeSeconds * 1000;
 }
 
 // -----------------------------
@@ -177,11 +174,11 @@ export function exportToJSON(
     participant: participantData,
     calibration: calibrationData
       ? {
-          fittsEquation: calibrationData.fittsEquation,
-          hicksEquation: calibrationData.hicksEquation,
-          fittsTrialsCount: calibrationData.fittsTrials.length,
-          hicksTrialsCount: calibrationData.hicksTrials.length,
-        }
+        fittsEquation: calibrationData.fittsEquation,
+        hicksEquation: calibrationData.hicksEquation,
+        fittsTrialsCount: calibrationData.fittsTrials.length,
+        hicksTrialsCount: calibrationData.hicksTrials.length,
+      }
       : null,
     results,
   }, null, 2);

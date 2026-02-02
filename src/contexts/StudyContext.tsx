@@ -287,7 +287,7 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
       }
 
       // -------------------------------
-      // KLM (form input)
+      // KLM (form input): (characters + 1) × 0.2 s in ms
       // -------------------------------
       if (
         result.taskType === "form-input" &&
@@ -334,8 +334,21 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
           (result as any).distractorCount;
       }
 
+      const { startCursorPos, distractorCount, ...resultRest } = result as TaskResultInput & { startCursorPos?: unknown; distractorCount?: unknown };
+      const resultAny = result as TaskResultInput & { acquireDistancePx?: number; acquireWidthPx?: number };
+      const targetDistancePx =
+        result.targetDistancePx ??
+        (resultAny.taskType === "drag-drop" && typeof resultAny.acquireDistancePx === "number"
+          ? resultAny.acquireDistancePx
+          : undefined);
+      const targetWidthPx =
+        result.targetWidthPx ??
+        (resultAny.taskType === "drag-drop" && typeof resultAny.acquireWidthPx === "number"
+          ? resultAny.acquireWidthPx
+          : undefined);
+
       const fullResult: TaskResult = {
-        ...result,
+        ...resultRest,
         participantId: prev.participantId,
         conditionLabel: condition?.label || "",
         interfaceMode: condition?.interfaceMode || "light",
@@ -343,6 +356,9 @@ export function StudyProvider({ children }: { children: React.ReactNode }) {
         timestamp: new Date().toISOString(),
         predictedTimeMs: predictedTime,
         efficiency: efficiency,
+        targetDistancePx: targetDistancePx ?? undefined,
+        targetWidthPx: targetWidthPx ?? undefined,
+        totalClicks: result.totalClicks,
       };
 
       return { ...prev, results: [...prev.results, fullResult] };

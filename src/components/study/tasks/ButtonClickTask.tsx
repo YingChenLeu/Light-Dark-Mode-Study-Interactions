@@ -38,80 +38,80 @@ export function ButtonClickTask({ task, onComplete }: TaskProps) {
   const startPosition = useRef<{ x: number; y: number } | null>(null);
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
-
+  const recordInitialCursorPosition = (e: MouseEvent) => {
+    startPosition.current = { x: e.clientX, y: e.clientY };
+  };
 
   useEffect(() => {
-    if (!started) return;
+    if (!started || completed) return;
 
     const handleMouseMove = (e: MouseEvent) => {
       cursorPositions.current.push({ x: e.clientX, y: e.clientY });
     };
 
     window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [started]);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+    };
+  }, [started, completed]);
 
   const handleButtonClick = useCallback(
-  (buttonLabel: string) => {
-    if (!started || completed) return;
+    (buttonLabel: string) => {
+      if (!started || completed) return;
 
-    setClicks(prev => prev + 1);
+      setClicks((prev) => prev + 1);
 
-    if (buttonLabel === targetButton) {
-      const targetEl = buttonRefs.current[buttonLabel];
-      let targetDistance = null;
-      let targetWidth = null;
+      if (buttonLabel === targetButton) {
+        const targetEl = buttonRefs.current[buttonLabel];
+        let targetDistance = null;
+        let targetWidth = null;
 
-      if (targetEl && startPosition.current) {
-        const rect = targetEl.getBoundingClientRect();
+        if (targetEl && startPosition.current !== null) {
+          const rect = targetEl.getBoundingClientRect();
 
-        const targetCenter = {
-          x: rect.left + rect.width / 2,
-          y: rect.top + rect.height / 2,
-        };
+          const targetCenter = {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2,
+          };
 
-        const dx = targetCenter.x - startPosition.current.x;
-        const dy = targetCenter.y - startPosition.current.y;
+          const dx = targetCenter.x - startPosition.current.x;
+          const dy = targetCenter.y - startPosition.current.y;
 
-        targetDistance = Math.sqrt(dx * dx + dy * dy);
-        targetWidth = rect.width;
+          targetDistance = Math.sqrt(dx * dx + dy * dy);
+          targetWidth = rect.width;
+        }
+
+        setCompleted(true);
+        const endTime = performance.now();
+
+        setTimeout(() => {
+          onComplete({
+            completionTimeMs: Math.round(endTime - startTime),
+            totalClicks: clicks,
+            incorrectClicks,
+            cursorDistancePx: calculateCursorDistance(cursorPositions.current),
+            targetDistancePx: targetDistance,
+            targetWidthPx: targetWidth,
+            success: true,
+          });
+        }, 800);
+      } else {
+        setIncorrectClicks((prev) => prev + 1);
       }
-
-      window.removeEventListener("mousemove", () => {});
-
-      setCompleted(true);
-      const endTime = performance.now();
-
-      setTimeout(() => {
-        onComplete({
-          completionTimeMs: Math.round(endTime - startTime),
-          totalClicks: clicks,
-          incorrectClicks,
-          cursorDistancePx: calculateCursorDistance(cursorPositions.current),
-          targetDistancePx: targetDistance,
-          targetWidthPx: targetWidth,
-          success: true,
-        });
-      }, 800);
-    } else {
-      setIncorrectClicks(prev => prev + 1);
-    }
-  },
-  [started, completed, targetButton, startTime, clicks, incorrectClicks, onComplete]
-);
+    },
+    [started, completed, targetButton, startTime, clicks, incorrectClicks, onComplete]
+  );
 
   const handleStart = useCallback(() => {
     const shuffled = [...buttons].sort(() => Math.random() - 0.5);
     setShuffledButtons(shuffled);
     setStarted(true);
     setStartTime(performance.now());
-    startPosition.current = null;
     cursorPositions.current = [];
-    startPosition.current = {
-      x: window.innerWidth / 2,
-      y: window.innerHeight / 2,
-    };
-  }, []);
+    startPosition.current = null;
+    window.addEventListener("mousemove", recordInitialCursorPosition, { once: true });
+  }, [buttons]);
 
   if (!targetButton) {
     return (
@@ -149,7 +149,9 @@ export function ButtonClickTask({ task, onComplete }: TaskProps) {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center h-full space-y-8">
+    <div 
+      className="flex flex-col items-center justify-center h-full space-y-8"
+    >
       {started && !completed && targetButton && (
         <p className="text-lg font-medium text-foreground">
           Click the <span className="font-semibold">{targetButton}</span> button

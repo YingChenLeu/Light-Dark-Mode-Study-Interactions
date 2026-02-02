@@ -29,15 +29,27 @@ export interface TaskResult {
   conditionLabel: string;
   interfaceMode: InterfaceMode;
   roomCondition: RoomCondition;
+
+  // Performance metrics
   completionTimeMs: number;
+  success: boolean;
+  timestamp: string;
+
+  // Interaction metrics
   totalClicks: number;
   incorrectClicks: number;
   cursorDistancePx: number;
-  success: boolean;
-  timestamp: string;
+
+  // Fitts' Law inputs (optional per task)
+  targetDistancePx?: number | null;
+  targetWidthPx?: number | null;
+
+  // Prediction & analysis
   predictedTimeMs?: number;
-  targetText?: string;
   efficiency?: number;
+
+  // Optional task-specific context
+  targetText?: string;
 }
 
 export interface ParticipantData {

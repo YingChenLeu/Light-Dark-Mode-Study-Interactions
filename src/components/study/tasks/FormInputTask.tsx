@@ -20,6 +20,7 @@ interface TaskProps {
     incorrectClicks: number;
     cursorDistancePx: number;
     success: boolean;
+    targetText?: string;
   }) => void;
 }
 
@@ -70,6 +71,7 @@ export function FormInputTask({ task, onComplete }: TaskProps) {
     if (inputValue.trim() === targetSentence) {
       setCompleted(true);
       const endTime = performance.now();
+      const capturedTargetText = targetSentence; // Capture for closure
       
       setTimeout(() => {
         onComplete({
@@ -78,6 +80,7 @@ export function FormInputTask({ task, onComplete }: TaskProps) {
           incorrectClicks,
           cursorDistancePx: calculateCursorDistance(cursorPositions.current),
           success: true,
+          targetText: capturedTargetText || undefined,
         });
       }, 800);
     } else {

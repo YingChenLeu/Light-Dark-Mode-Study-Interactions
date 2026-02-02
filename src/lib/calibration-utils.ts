@@ -52,8 +52,22 @@ export function computeFittsEquation(trials: FittsTrialData[]): FittsLawEquation
     return { a: 200, b: 150, r2: 0 }; // Default fallback values
   }
 
-  const xValues = successfulTrials.map(t => t.indexOfDifficulty);
-  const yValues = successfulTrials.map(t => t.movementTimeMs);
+  // Remove extreme movement times (top 5 highest and bottom 5 lowest)
+  // to reduce noise not explained by ID and improve the fit.
+  let trimmedTrials = successfulTrials;
+  if (successfulTrials.length > 10) {
+    const sorted = [...successfulTrials].sort(
+      (a, b) => a.movementTimeMs - b.movementTimeMs
+    );
+    trimmedTrials = sorted.slice(5, sorted.length - 5);
+  }
+
+  if (trimmedTrials.length < 3) {
+    return { a: 200, b: 150, r2: 0 };
+  }
+
+  const xValues = trimmedTrials.map(t => t.indexOfDifficulty);
+  const yValues = trimmedTrials.map(t => t.movementTimeMs);
 
   return linearRegression(xValues, yValues);
 }
@@ -61,13 +75,42 @@ export function computeFittsEquation(trials: FittsTrialData[]): FittsLawEquation
 // Compute Hick's Law equation from trial data
 // RT = a + b * log2(n) where n is number of choices
 export function computeHicksEquation(trials: HicksTrialData[]): HicksLawEquation {
+  // 1) Keep only correct trials
   const correctTrials = trials.filter(t => t.correct);
-  if (correctTrials.length < 3) {
+
+  // 2) Remove extreme outliers (very fast or very slow responses),
+  //    which add noise unrelated to log2(n) and hurt R².
+  //    Thresholds are in milliseconds.
+  const filteredTrials = correctTrials.filter(t => 
+    t.reactionTimeMs >= 150 && t.reactionTimeMs <= 1500
+  );
+
+  if (filteredTrials.length < 3) {
     return { a: 200, b: 150, r2: 0 }; // Default fallback values
   }
 
-  const xValues = correctTrials.map(t => Math.log2(t.numChoices));
-  const yValues = correctTrials.map(t => t.reactionTimeMs);
+  // 3) Aggregate to mean RT per choice level. This reduces trial-level noise
+  //    and typically yields a clearer Hick's Law relationship and higher R².
+  const rtByChoices = new Map<number, number[]>();
+  for (const t of filteredTrials) {
+    const list = rtByChoices.get(t.numChoices) ?? [];
+    list.push(t.reactionTimeMs);
+    rtByChoices.set(t.numChoices, list);
+  }
+
+  const uniqueChoiceLevels = Array.from(rtByChoices.keys()).sort((a, b) => a - b);
+
+  // Need at least 3 distinct choice levels to fit a sensible line
+  if (uniqueChoiceLevels.length < 3) {
+    return { a: 200, b: 150, r2: 0 };
+  }
+
+  const xValues = uniqueChoiceLevels.map(n => Math.log2(n));
+  const yValues = uniqueChoiceLevels.map(n => {
+    const rts = rtByChoices.get(n)!;
+    const sum = rts.reduce((acc, v) => acc + v, 0);
+    return sum / rts.length;
+  });
 
   return linearRegression(xValues, yValues);
 }
@@ -173,11 +216,11 @@ export function generateHicksTrials(): {
     targetKey: string;
     rangeStartIndex: number;
   }[] = [];
-
-  const choiceLevels = [2, 3, 4, 5, 6, 7];
+  // Use 5 distinct choice levels with 8 repetitions each = 40 trials total.
+  const choiceLevels = [2, 3, 4, 5, 6];
 
   for (const numChoices of choiceLevels) {
-    for (let rep = 0; rep < 4; rep++) {
+    for (let rep = 0; rep < 8; rep++) {
       const rangeStartIndex = Math.floor(
         Math.random() * (allKeys.length - numChoices + 1)
       );

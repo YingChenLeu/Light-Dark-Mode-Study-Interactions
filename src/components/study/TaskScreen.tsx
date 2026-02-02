@@ -19,6 +19,9 @@ export function TaskScreen() {
     incorrectClicks: number;
     cursorDistancePx: number;
     success: boolean;
+    targetDistancePx?: number | null;
+    targetWidthPx?: number | null;
+    targetText?: string;
   }) => {
     if (!task) return;
 
