@@ -23,43 +23,48 @@ const SHAPES = [
 ];
 
 export function ChoiceReactionTask({ task, onComplete }: TaskProps) {
-  const [phase, setPhase] = useState<"ready" | "waiting" | "stimulus" | "complete">("ready");
+  const [phase, setPhase] = useState<
+    "ready" | "waiting" | "stimulus" | "complete"
+  >("ready");
   const [startTime, setStartTime] = useState<number>(0);
   const [numChoices, setNumChoices] = useState(3);
   const [activeChoices, setActiveChoices] = useState<typeof SHAPES>([]);
-  const [targetShape, setTargetShape] = useState<typeof SHAPES[0] | null>(null);
+  const [targetShape, setTargetShape] = useState<(typeof SHAPES)[0] | null>(
+    null
+  );
   const [incorrectPresses, setIncorrectPresses] = useState(0);
   const [totalPresses, setTotalPresses] = useState(0);
   const [distractorId, setDistractorId] = useState<string | null>(null);
-  
+
   const stimulusTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const distractorIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleStart = useCallback(() => {
     // Random number of choices
-    const count = CHOICE_COUNTS[Math.floor(Math.random() * CHOICE_COUNTS.length)];
+    const count =
+      CHOICE_COUNTS[Math.floor(Math.random() * CHOICE_COUNTS.length)];
     setNumChoices(count);
-    
-    // Select which shapes to use
-    const shuffledShapes = [...SHAPES].sort(() => Math.random() - 0.5);
-    const choices = shuffledShapes.slice(0, count);
-    setActiveChoices(choices);
-    
-    // Pick target from task.targetValue
-    const targetFromTask = choices.find(
-      s => s.id === task.targetValue
-    ) || choices[0];
 
+    // Target is always the one from task.instruction (task.targetValue)
+    const targetFromTask =
+      SHAPES.find((s) => s.id === task.targetValue) || SHAPES[0];
+    const others = SHAPES.filter((s) => s.id !== targetFromTask.id);
+    const shuffledOthers = [...others].sort(() => Math.random() - 0.5);
+    const choices = [
+      targetFromTask,
+      ...shuffledOthers.slice(0, count - 1),
+    ].sort(() => Math.random() - 0.5);
+    setActiveChoices(choices);
     setTargetShape(targetFromTask);
-    
+
     setPhase("waiting");
     setIncorrectPresses(0);
     setTotalPresses(0);
 
     // Start random distractor flashes during waiting phase
     distractorIntervalRef.current = setInterval(() => {
-      setDistractorId(prev => {
-        const nonTargets = choices.filter(s => s.id !== targetFromTask.id);
+      setDistractorId((prev) => {
+        const nonTargets = choices.filter((s) => s.id !== targetFromTask.id);
         if (nonTargets.length === 0) return null;
         const randomDistractor =
           nonTargets[Math.floor(Math.random() * nonTargets.length)];
@@ -80,31 +85,34 @@ export function ChoiceReactionTask({ task, onComplete }: TaskProps) {
     }, delay);
   }, [task]);
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.code !== "Space") return;
-    e.preventDefault();
-    
-    if (phase === "waiting") {
-      // Early press - count as incorrect
-      setTotalPresses(prev => prev + 1);
-      setIncorrectPresses(prev => prev + 1);
-      return;
-    }
-    
-    if (phase === "stimulus" && targetShape) {
-      const endTime = performance.now();
-      setPhase("complete");
-      setTotalPresses(prev => prev + 1);
-      
-      onComplete({
-        completionTimeMs: Math.round(endTime - startTime),
-        totalClicks: totalPresses + 1,
-        incorrectClicks: incorrectPresses,
-        cursorDistancePx: 0, // No cursor movement needed
-        success: true,
-      });
-    }
-  }, [phase, targetShape, startTime, totalPresses, incorrectPresses, onComplete]);
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.code !== "Space") return;
+      e.preventDefault();
+
+      if (phase === "waiting") {
+        // Early press - count as incorrect
+        setTotalPresses((prev) => prev + 1);
+        setIncorrectPresses((prev) => prev + 1);
+        return;
+      }
+
+      if (phase === "stimulus" && targetShape) {
+        const endTime = performance.now();
+        setPhase("complete");
+        setTotalPresses((prev) => prev + 1);
+
+        onComplete({
+          completionTimeMs: Math.round(endTime - startTime),
+          totalClicks: totalPresses + 1,
+          incorrectClicks: incorrectPresses,
+          cursorDistancePx: 0, // No cursor movement needed
+          success: true,
+        });
+      }
+    },
+    [phase, targetShape, startTime, totalPresses, incorrectPresses, onComplete]
+  );
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
@@ -123,18 +131,16 @@ export function ChoiceReactionTask({ task, onComplete }: TaskProps) {
   }, []);
 
   if (phase === "ready") {
+    const targetForInstruction = SHAPES.find((s) => s.id === task.targetValue);
     return (
       <div className="flex flex-col items-center justify-start h-full space-y-6 pt-24">
         <p className="text-lg text-foreground text-center max-w-md">
-          {task.instruction || (
-            targetShape
-              ? `Press SPACE when you see the ${targetShape.id} appear`
-              : "Press SPACE when you see the target shape appear"
-          )}
+          {task.instruction}
         </p>
         <p className="text-sm text-muted-foreground text-center max-w-md">
-          You will see several possible shapes. When the target ({targetShape?.label}) is highlighted,
-          press SPACE as quickly as possible.
+          When the target shape
+          {targetForInstruction ? ` (${targetForInstruction.label})` : ""} is
+          highlighted, press SPACE as quickly as possible.
         </p>
         <Button onClick={handleStart} size="lg">
           Start Task
@@ -187,16 +193,16 @@ export function ChoiceReactionTask({ task, onComplete }: TaskProps) {
       {/* Status */}
       <div className="text-center space-y-2">
         {phase === "waiting" && (
-          <p className="text-lg text-muted-foreground">Wait for the target...</p>
+          <p className="text-lg text-muted-foreground">
+            Wait for the target...
+          </p>
         )}
         {phase === "stimulus" && (
           <p className="text-lg font-bold text-foreground animate-pulse">
             Press SPACE now!
           </p>
         )}
-        <p className="text-xs text-muted-foreground">
-          Choices: {numChoices}
-        </p>
+        <p className="text-xs text-muted-foreground">Choices: {numChoices}</p>
         <p className="text-xs text-muted-foreground">
           Accidental presses: {incorrectPresses}
         </p>

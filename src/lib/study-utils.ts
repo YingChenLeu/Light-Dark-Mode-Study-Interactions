@@ -99,7 +99,7 @@ export function createTasks(): Task[] {
     if (targetValue) {
       switch (task.type) {
         case "button-click":
-          instruction = `Click the ${targetValue} button`;
+          instruction = `Click the "${targetValue}" button`;
           break;
 
         case "list-select":
