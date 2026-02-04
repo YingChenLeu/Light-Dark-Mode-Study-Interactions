@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Task } from "@/types/study";
 import { Button } from "@/components/ui/button";
 import { calculateCursorDistance } from "@/lib/study-utils";
@@ -37,10 +37,6 @@ export function ButtonClickTask({ task, onComplete }: TaskProps) {
   const cursorPositions = useRef<{ x: number; y: number }[]>([]);
   const startPosition = useRef<{ x: number; y: number } | null>(null);
   const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-
-  const recordInitialCursorPosition = (e: MouseEvent) => {
-    startPosition.current = { x: e.clientX, y: e.clientY };
-  };
 
   useEffect(() => {
     if (!started || completed) return;
@@ -100,18 +96,28 @@ export function ButtonClickTask({ task, onComplete }: TaskProps) {
         setIncorrectClicks((prev) => prev + 1);
       }
     },
-    [started, completed, targetButton, startTime, clicks, incorrectClicks, onComplete]
+    [
+      started,
+      completed,
+      targetButton,
+      startTime,
+      clicks,
+      incorrectClicks,
+      onComplete,
+    ]
   );
 
-  const handleStart = useCallback(() => {
-    const shuffled = [...buttons].sort(() => Math.random() - 0.5);
-    setShuffledButtons(shuffled);
-    setStarted(true);
-    setStartTime(performance.now());
-    cursorPositions.current = [];
-    startPosition.current = null;
-    window.addEventListener("mousemove", recordInitialCursorPosition, { once: true });
-  }, [buttons]);
+  const handleStart = useCallback(
+    (e: React.MouseEvent) => {
+      const shuffled = [...buttons].sort(() => Math.random() - 0.5);
+      setShuffledButtons(shuffled);
+      setStarted(true);
+      setStartTime(performance.now());
+      cursorPositions.current = [];
+      startPosition.current = { x: e.clientX, y: e.clientY };
+    },
+    [buttons]
+  );
 
   if (!targetButton) {
     return (
@@ -127,8 +133,12 @@ export function ButtonClickTask({ task, onComplete }: TaskProps) {
     return (
       <div className="flex flex-col items-center justify-center h-full space-y-6">
         <div className="text-center space-y-2">
-          <p className="text-lg font-medium text-foreground">{task.instruction}</p>
-          <p className="text-sm text-muted-foreground">Click "Start Task" when ready</p>
+          <p className="text-lg font-medium text-foreground">
+            {task.instruction}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Click "Start Task" when ready
+          </p>
         </div>
         <Button onClick={handleStart} size="lg">
           Start Task
@@ -149,15 +159,13 @@ export function ButtonClickTask({ task, onComplete }: TaskProps) {
   }
 
   return (
-    <div 
-      className="flex flex-col items-center justify-center h-full space-y-8"
-    >
+    <div className="flex flex-col items-center justify-center h-full space-y-8">
       {started && !completed && targetButton && (
         <p className="text-lg font-medium text-foreground">
           Click the <span className="font-semibold">{targetButton}</span> button
         </p>
       )}
-      
+
       <div className="flex gap-4 flex-wrap justify-center translate-y-64">
         {shuffledButtons.map((label) => (
           <Button

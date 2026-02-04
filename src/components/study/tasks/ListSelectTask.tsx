@@ -23,6 +23,7 @@ interface TaskProps {
     targetDistancePx?: number;
     targetWidthPx?: number;
     success: boolean;
+    numChoices: number;
   }) => void;
 }
 
@@ -84,53 +85,67 @@ export function ListSelectTask({ task, onComplete }: TaskProps) {
     setShuffledItems(shuffleArray(getListItems()));
   }, [task.targetValue]);
 
-  const handleItemClick = useCallback((item: string) => {
-    if (!started || completed) return;
+  const handleItemClick = useCallback(
+    (item: string) => {
+      if (!started || completed) return;
 
-    setClicks(prevClicks => {
-      const newClicks = prevClicks + 1;
-      setSelectedItem(item);
+      setClicks((prevClicks) => {
+        const newClicks = prevClicks + 1;
+        setSelectedItem(item);
 
-      if (item === targetItem) {
-        // Capture target distance/width synchronously before re-render unmounts the list
-        const el = document.getElementById(`item-${item}`);
-        let targetDistance: number | null = null;
-        let targetWidth: number | null = null;
-        if (el && startPosition.current !== null) {
-          const rect = el.getBoundingClientRect();
-          const centerX = rect.left + rect.width / 2;
-          const centerY = rect.top + rect.height / 2;
-          targetDistance = Math.hypot(
-            centerX - startPosition.current.x,
-            centerY - startPosition.current.y
-          );
-          targetWidth = rect.width;
+        if (item === targetItem) {
+          // Capture target distance/width synchronously before re-render unmounts the list
+          const el = document.getElementById(`item-${item}`);
+          let targetDistance: number | null = null;
+          let targetWidth: number | null = null;
+          if (el && startPosition.current !== null) {
+            const rect = el.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            targetDistance = Math.hypot(
+              centerX - startPosition.current.x,
+              centerY - startPosition.current.y
+            );
+            targetWidth = rect.width;
+          }
+
+          const endTime = performance.now();
+          const completionTimeMs = Math.round(endTime - startTime);
+          const incorrectClicksValue = incorrectClicks;
+
+          setCompleted(true);
+
+          setTimeout(() => {
+            onComplete({
+              completionTimeMs,
+              totalClicks: newClicks,
+              incorrectClicks: incorrectClicksValue,
+              cursorDistancePx: calculateCursorDistance(
+                cursorPositions.current
+              ),
+              targetDistancePx: targetDistance ?? undefined,
+              targetWidthPx: targetWidth ?? undefined,
+              success: true,
+              numChoices: shuffledItems.length,
+            });
+          }, 800);
+        } else {
+          setIncorrectClicks((prev) => prev + 1);
         }
 
-        const endTime = performance.now();
-        const completionTimeMs = Math.round(endTime - startTime);
-        const incorrectClicksValue = incorrectClicks;
-
-        setCompleted(true);
-
-        setTimeout(() => {
-          onComplete({
-            completionTimeMs,
-            totalClicks: newClicks,
-            incorrectClicks: incorrectClicksValue,
-            cursorDistancePx: calculateCursorDistance(cursorPositions.current),
-            targetDistancePx: targetDistance ?? undefined,
-            targetWidthPx: targetWidth ?? undefined,
-            success: true,
-          });
-        }, 800);
-      } else {
-        setIncorrectClicks(prev => prev + 1);
-      }
-
-      return newClicks;
-    });
-  }, [started, completed, targetItem, startTime, incorrectClicks, onComplete, shuffledItems.length]);
+        return newClicks;
+      });
+    },
+    [
+      started,
+      completed,
+      targetItem,
+      startTime,
+      incorrectClicks,
+      onComplete,
+      shuffledItems.length,
+    ]
+  );
 
   if (!targetItem) {
     return (
@@ -146,8 +161,12 @@ export function ListSelectTask({ task, onComplete }: TaskProps) {
     return (
       <div className="flex flex-col items-center justify-center h-full space-y-6">
         <div className="text-center space-y-2">
-          <p className="text-lg font-medium text-foreground">{task.instruction}</p>
-          <p className="text-sm text-muted-foreground">Click "Start Task" when ready</p>
+          <p className="text-lg font-medium text-foreground">
+            {task.instruction}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Click "Start Task" when ready
+          </p>
         </div>
         <Button onClick={handleStart} size="lg">
           Start Task
@@ -168,12 +187,10 @@ export function ListSelectTask({ task, onComplete }: TaskProps) {
   }
 
   return (
-    <div 
-      className="flex flex-col items-center justify-center h-full space-y-6"
-    >
+    <div className="flex flex-col items-center justify-center h-full space-y-6">
       <p className="text-lg font-medium text-foreground">{task.instruction}</p>
-      
-      <div 
+
+      <div
         className="w-full max-w-xs bg-card border border-border rounded-lg overflow-hidden translate-y-56  shadow-md"
         onClick={(e) => e.stopPropagation()}
       >

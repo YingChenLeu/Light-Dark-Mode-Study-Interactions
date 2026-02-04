@@ -10,6 +10,7 @@ interface TaskProps {
     incorrectClicks: number;
     cursorDistancePx: number;
     success: boolean;
+    numChoices: number;
   }) => void;
 }
 
@@ -108,10 +109,19 @@ export function ChoiceReactionTask({ task, onComplete }: TaskProps) {
           incorrectClicks: incorrectPresses,
           cursorDistancePx: 0, // No cursor movement needed
           success: true,
+          numChoices,
         });
       }
     },
-    [phase, targetShape, startTime, totalPresses, incorrectPresses, onComplete]
+    [
+      phase,
+      targetShape,
+      startTime,
+      totalPresses,
+      incorrectPresses,
+      numChoices,
+      onComplete,
+    ]
   );
 
   useEffect(() => {

@@ -9,30 +9,40 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useCallback } from "react";
 
 export function TaskScreen() {
-  const { state, getCurrentTask, getCurrentCondition, recordTaskResult, nextPhase } = useStudy();
+  const {
+    state,
+    getCurrentTask,
+    getCurrentCondition,
+    recordTaskResult,
+    nextPhase,
+  } = useStudy();
   const task = getCurrentTask();
   const condition = getCurrentCondition();
 
-  const handleTaskComplete = useCallback((metrics: {
-    completionTimeMs: number;
-    totalClicks: number;
-    incorrectClicks: number;
-    cursorDistancePx: number;
-    success: boolean;
-    targetDistancePx?: number | null;
-    targetWidthPx?: number | null;
-    targetText?: string;
-  }) => {
-    if (!task) return;
+  const handleTaskComplete = useCallback(
+    (metrics: {
+      completionTimeMs: number;
+      totalClicks: number;
+      incorrectClicks: number;
+      cursorDistancePx: number;
+      success: boolean;
+      targetDistancePx?: number | null;
+      targetWidthPx?: number | null;
+      targetText?: string;
+      numChoices?: number;
+    }) => {
+      if (!task) return;
 
-    recordTaskResult({
-      taskId: task.id,
-      taskType: task.type,
-      ...metrics,
-    });
+      recordTaskResult({
+        taskId: task.id,
+        taskType: task.type,
+        ...metrics,
+      });
 
-    nextPhase();
-  }, [task, recordTaskResult, nextPhase]);
+      nextPhase();
+    },
+    [task, recordTaskResult, nextPhase]
+  );
 
   if (!task || !condition) return null;
 
@@ -63,10 +73,10 @@ export function TaskScreen() {
       {/* Task Area */}
       <Card className="flex-1">
         <CardContent className="h-full p-6">
-          <TaskComponent 
+          <TaskComponent
             key={`${task.id}-${state.currentConditionIndex}`}
-            task={task} 
-            onComplete={handleTaskComplete} 
+            task={task}
+            onComplete={handleTaskComplete}
           />
         </CardContent>
       </Card>

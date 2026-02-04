@@ -50,6 +50,8 @@ export interface TaskResult {
 
   // Optional task-specific context
   targetText?: string;
+  /** Number of alternatives (for Hick's Law: log2(n)) */
+  numChoices?: number;
 }
 
 export interface ParticipantData {
